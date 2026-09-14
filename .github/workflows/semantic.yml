@@ -1,0 +1,43 @@
+name: Semantic
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: semantic-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  semantic:
+    name: semantic
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check PR title and commit subjects
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: ${{ github.event.pull_request.title }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          re='^(feat|fix|perf|refactor|docs|test|ci|build|chore|style|revert)(\([a-z0-9._-]+\))?!?: [^ ].{0,99}$'
+          fail=0
+          check() {
+            case "$2" in
+              "Merge branch "*|"Merge remote-tracking branch "*|"Revert \""*) return 0 ;;
+            esac
+            if ! grep -Eq "$re" <<<"$2"; then
+              echo "::error::$1 is not semantic: $2"
+              fail=1
+            fi
+          }
+          check "PR title" "$TITLE"
+          while IFS= read -r subject; do
+            check "Commit subject" "$subject"
+          done < <(gh api "repos/$REPO/pulls/$PR/commits" --paginate --jq '.[].commit.message | split("\n")[0]')
+          exit $fail

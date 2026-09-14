@@ -1,0 +1,20 @@
+changelog:
+  exclude:
+    labels: [invalid, duplicate, wontfix]
+  categories:
+    - title: Bug Fixes
+      labels: [bug]
+    - title: 2026 Rules
+      labels: [2026-rules]
+    - title: Dashboard
+      labels: [frontend]
+    - title: Backend
+      labels: [backend, parser, api, storage]
+    - title: Performance
+      labels: [perf]
+    - title: Documentation
+      labels: [docs]
+    - title: Maintenance
+      labels: [ci, infra, dependencies]
+    - title: Other Changes
+      labels: ["*"]
