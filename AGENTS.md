@@ -17,6 +17,9 @@ uv run ruff format .     # format
 uv run mypy              # strict type check
 ```
 
+Frontend (once `frontend/` exists), run from `frontend/`: `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`.
+CI (`.github/workflows/ci.yml`) runs every command above and skips a side whose directory doesn't exist yet.
+
 Record and replay game UDP without the game running:
 
 ```sh
