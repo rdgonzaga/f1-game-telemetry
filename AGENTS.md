@@ -27,12 +27,14 @@ uv run python tools/record_raw.py --out recordings/lap.f1raw
 uv run python tools/replay_raw.py recordings/lap.f1raw --speed 2
 uv run python tools/inspect_raw.py recordings/lap.f1raw     # sizes, sessions, events, lap/pit/tyre timeline
 uv run python tools/trim_raw.py recordings/lap.f1raw tests/fixtures/x.f1raw --start 60 --end 61
+uv run python tools/bench_parse.py                            # parse time per packet type
 ```
 
 ## Layout
 
 - `f1telemetry/` backend package (`rawfile.py` = `.f1raw` recording format)
-- `tools/` developer scripts (UDP recorder, replayer, inspector and trimmer)
+- `tools/` developer scripts (UDP recorder, replayer, inspector, trimmer and parse benchmark)
+- `docs/udp-spec.md` packet layouts, format differences and real-game behaviour the backend relies on
 - `tests/` pytest suite; small committed recordings go in `tests/fixtures/` (see its README)
 - `recordings/`, `data/` local, gitignored
 
