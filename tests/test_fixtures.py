@@ -20,9 +20,10 @@ from f1telemetry.event import Flashback, SessionEnded
 from f1telemetry.lap_data import LapData
 from f1telemetry.names import formula_name, session_type_name, track_name, visual_tyre_compound_name
 from f1telemetry.packets import Packet, PacketId
+from f1telemetry.parsers import make_dispatcher
 from f1telemetry.rawfile import read_records
 from f1telemetry.session import Session
-from inspect_raw import inspect, make_dispatcher
+from inspect_raw import inspect
 
 FIXTURES = Path(__file__).parent / "fixtures"
 MAX_FIXTURE_BYTES = 300_000
