@@ -25,7 +25,7 @@ target-version = "py312"
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["f1telemetry", "record_raw", "replay_raw"]
+known-first-party = ["f1telemetry", "inspect_raw", "record_raw", "replay_raw", "trim_raw"]
 
 [tool.mypy]
 python_version = "3.12"
