@@ -9,7 +9,7 @@ import struct
 from enum import IntEnum
 from typing import NamedTuple
 
-from f1telemetry.packets import FORMATS, HEADER, PacketDispatcher, PacketHeader, PacketId
+from f1telemetry.packets import PacketDispatcher, PacketHeader, PacketId, player_car_offset
 
 CAR_TELEMETRY_2 = struct.Struct("<B?H??H??")
 FORMAT = 2026
@@ -33,10 +33,10 @@ class CarTelemetry2(NamedTuple):
 
 def parse_car_telemetry2(header: PacketHeader, data: bytes) -> CarTelemetry2 | None:
     """Decode the player car's entry; None when there is no player car (e.g. spectating)."""
-    index = header.player_car_index
-    if index >= FORMATS[FORMAT].max_cars:
+    offset = player_car_offset(header, CAR_TELEMETRY_2.size)
+    if offset is None:
         return None
-    return CarTelemetry2._make(CAR_TELEMETRY_2.unpack_from(data, HEADER.size + index * CAR_TELEMETRY_2.size))
+    return CarTelemetry2._make(CAR_TELEMETRY_2.unpack_from(data, offset))
 
 
 def register(dispatcher: PacketDispatcher) -> None:

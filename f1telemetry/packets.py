@@ -111,6 +111,14 @@ class Packet(NamedTuple):
     data: object
 
 
+def player_car_offset(header: PacketHeader, car_size: int) -> int | None:
+    """Byte offset of the player's slot in a per-car array; None when there is no player car (e.g. spectating)."""
+    index = header.player_car_index
+    if index >= FORMATS[header.packet_format].max_cars:
+        return None
+    return HEADER.size + index * car_size
+
+
 class PacketDispatcher:
     """Routes raw datagrams to parsers registered per packet format and packet id."""
 
