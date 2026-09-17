@@ -10,9 +10,11 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
+from f1telemetry.packets import HEADER, PACKET_ID_OFFSET, PacketId
 from f1telemetry.rawfile import FILE_HEADER, MAGIC, RawFileError, RawWriter, read_records
 from record_raw import record
 from replay_raw import replay
+from trim_raw import trim
 
 PACKETS = [(0, b"\x01" * 29), (5_000_000, b"\x02" * 1448), (40_000_000, b"\x03" * 269)]
 
@@ -102,3 +104,30 @@ def test_record_then_replay_roundtrip(tmp_path: Path) -> None:
     assert [data for _, data in recorded] == [data for _, data in PACKETS]
     assert recorded[0][0] == 0
     assert [t for t, _ in recorded] == sorted(t for t, _ in recorded)
+
+
+def fake_packet(packet_id: int, tag: int) -> bytes:
+    data = bytearray([tag]) * HEADER.size
+    data[PACKET_ID_OFFSET] = packet_id
+    return bytes(data)
+
+
+def test_trim_keeps_parsed_packets_in_window_and_rebases_time(tmp_path: Path) -> None:
+    s = 1_000_000_000
+    source = write_file(
+        tmp_path / "source.f1raw",
+        [
+            (0, fake_packet(PacketId.LAP_DATA, 1)),
+            (2 * s, fake_packet(PacketId.MOTION, 2)),
+            (2 * s + 5, fake_packet(PacketId.CAR_TELEMETRY, 3)),
+            (3 * s, b"short"),
+            (3 * s, fake_packet(PacketId.EVENT, 4)),
+            (4 * s, fake_packet(PacketId.SESSION, 5)),
+        ],
+    )
+    out = tmp_path / "nested" / "out.f1raw"
+    assert trim(source, out, 1.5, 3.0) == 2
+    assert list(read_records(out)) == [
+        (0, fake_packet(PacketId.CAR_TELEMETRY, 3)),
+        (s - 5, fake_packet(PacketId.EVENT, 4)),
+    ]

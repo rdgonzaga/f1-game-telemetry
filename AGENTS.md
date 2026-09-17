@@ -25,13 +25,15 @@ Record and replay game UDP without the game running:
 ```sh
 uv run python tools/record_raw.py --out recordings/lap.f1raw
 uv run python tools/replay_raw.py recordings/lap.f1raw --speed 2
+uv run python tools/inspect_raw.py recordings/lap.f1raw     # sizes, sessions, events, lap/pit/tyre timeline
+uv run python tools/trim_raw.py recordings/lap.f1raw tests/fixtures/x.f1raw --start 60 --end 61
 ```
 
 ## Layout
 
 - `f1telemetry/` backend package (`rawfile.py` = `.f1raw` recording format)
-- `tools/` developer scripts (UDP recorder and replayer)
-- `tests/` pytest suite; small committed recordings go in `tests/fixtures/`
+- `tools/` developer scripts (UDP recorder, replayer, inspector and trimmer)
+- `tests/` pytest suite; small committed recordings go in `tests/fixtures/` (see its README)
 - `recordings/`, `data/` local, gitignored
 
 ## Performance rules
