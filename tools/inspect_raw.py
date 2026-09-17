@@ -13,27 +13,20 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from f1telemetry import car_damage, car_status, car_telemetry, car_telemetry2, event, lap_data, session
+from f1telemetry import event
 from f1telemetry.car_damage import CarDamage
 from f1telemetry.car_status import CarStatus
 from f1telemetry.car_telemetry import CarTelemetry
 from f1telemetry.car_telemetry2 import CarTelemetry2
 from f1telemetry.lap_data import LapData
 from f1telemetry.names import formula_name, session_type_name, track_name, visual_tyre_compound_name
-from f1telemetry.packets import FORMATS, HEADER, PACKET_ID_OFFSET, PacketDispatcher, PacketId
+from f1telemetry.packets import FORMATS, HEADER, PACKET_ID_OFFSET, PacketId
+from f1telemetry.parsers import make_dispatcher
 from f1telemetry.rawfile import read_records
 from f1telemetry.session import Session
 
-PARSER_MODULES = (session, event, lap_data, car_telemetry, car_status, car_damage, car_telemetry2)
 # BUTN fires several times a second while buttons are held; hidden unless --all-events.
 NOISY_EVENTS = {b"BUTN"}
-
-
-def make_dispatcher() -> PacketDispatcher:
-    dispatcher = PacketDispatcher()
-    for module in PARSER_MODULES:
-        module.register(dispatcher)
-    return dispatcher
 
 
 class Range:
