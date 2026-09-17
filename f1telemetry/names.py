@@ -80,3 +80,57 @@ def session_type_name(session_type: int) -> str:
 
 def formula_name(formula: int) -> str:
     return FORMULAS.get(formula, f"Unknown formula ({formula})")
+
+
+# Visual compound is what the game shows; actual compound is the C-rating. The same id means different tyres in each.
+VISUAL_TYRE_COMPOUNDS: dict[int, str] = {
+    7: "Inter",
+    8: "Wet",
+    9: "Classic Dry",
+    10: "Classic Wet",
+    15: "F2 Wet",
+    16: "Soft",
+    17: "Medium",
+    18: "Hard",
+    19: "F2 Super Soft",
+    20: "F2 Soft",
+    21: "F2 Medium",
+    22: "F2 Hard",
+}
+
+ACTUAL_TYRE_COMPOUNDS: dict[int, str] = {
+    7: "Inter",
+    8: "Wet",
+    9: "Classic Dry",
+    10: "Classic Wet",
+    11: "F2 Super Soft",
+    12: "F2 Soft",
+    13: "F2 Medium",
+    14: "F2 Hard",
+    15: "F2 Wet",
+    16: "C5",
+    17: "C4",
+    18: "C3",
+    19: "C2",
+    20: "C1",
+    21: "C0",
+    22: "C6",
+}
+
+# Mode 3 is Overtake in format 2025 and Boost in format 2026.
+ERS_DEPLOY_MODES: dict[int, dict[int, str]] = {
+    2025: {0: "None", 1: "Medium", 2: "Hotlap", 3: "Overtake"},
+    2026: {0: "None", 1: "Medium", 2: "Hotlap", 3: "Boost"},
+}
+
+
+def visual_tyre_compound_name(compound: int) -> str:
+    return VISUAL_TYRE_COMPOUNDS.get(compound, f"Unknown compound ({compound})")
+
+
+def actual_tyre_compound_name(compound: int) -> str:
+    return ACTUAL_TYRE_COMPOUNDS.get(compound, f"Unknown compound ({compound})")
+
+
+def ers_deploy_mode_name(mode: int, packet_format: int) -> str:
+    return ERS_DEPLOY_MODES.get(packet_format, {}).get(mode, f"Unknown mode ({mode})")
