@@ -18,6 +18,7 @@ PARSED_IDS = {
     PacketId.CAR_STATUS,
     PacketId.CAR_DAMAGE,
     PacketId.CAR_TELEMETRY_2,
+    PacketId.SESSION_HISTORY,
 }
 
 

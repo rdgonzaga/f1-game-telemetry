@@ -52,7 +52,7 @@ recognised by size but never unpacked.
 | 8 | FinalClassification | 1042 | 1134 | | | |
 | 9 | LobbyInfo | 954 | 1062 | | | |
 | 10 | CarDamage | 1041 | 1133 | 46 | 46 | yes |
-| 11 | SessionHistory | 1460 | 1460 | — | — | |
+| 11 | SessionHistory | 1460 | 1460 | — | — | yes |
 | 12 | TyreSets | 231 | 231 | — | — | |
 | 13 | MotionEx | 273 | 273 | — | — | |
 | 14 | TimeTrial | 101 | 104 | — | — | |
@@ -77,6 +77,8 @@ Tyre and brake arrays are always ordered **RL, RR, FL, FR**.
   power. See `f1telemetry/car_status.py`.
 - **CarDamage (10):** tyre wear and damage, brake damage, blisters, wing, floor, diffuser and sidepod damage,
   gearbox and engine damage. See `f1telemetry/car_damage.py`.
+- **SessionHistory (11):** one car per packet in rotation, about once a second each, with that car's lap and
+  sector times. Only the player's lap times are decoded (`f1telemetry/session_history.py`).
 - **CarTelemetry2 (16), 2026 only:** active aero mode and availability, overtake mode, `regulations2026Applicable`
   and `isDrivingWrongWay`. See `f1telemetry/car_telemetry2.py`.
 
@@ -96,18 +98,33 @@ Tyre and brake arrays are always ordered **RL, RR, FL, FR**.
 Observed in real recordings (F1 25 v1.26, `packetVersion` 1), and the reason several backend rules exist. The
 committed fixtures in `tests/fixtures/` pin the ones the parsers can show.
 
-- **Time Trial sends no `SSTA` or `SEND` event**, so session detection can't rely on events alone; a UID change or a
-  packet timeout has to end a session. Time Trial also freezes tyre temperatures, engine temperature, fuel, ERS store
-  and tyre wear, so those fields need a race session to verify.
+- **Sessions:** `SSTA` and `SEND` bracket most sessions, Time Trial included, but not all: restarting a race from
+  the menu gives a new `sessionUID` with no `SEND` for the old one. Restarting from the pause menu sends both.
+  Skipped career sessions get a UID of their own that only ever carries events (speed traps, retirements), so a
+  session needs its Session packet before it counts. `f1telemetry/tracker.py` opens a session on that packet and
+  closes it on `SEND` or a UID change.
+- **The game sends nothing while paused**, for as long as the pause lasts (gaps of six minutes in one career race).
+  Silence doesn't mean the session is over, so the tracker has no idle timeout.
+- Time Trial freezes tyre temperatures, engine temperature, fuel, ERS store and tyre wear, so those fields need a
+  race session to verify.
 - **At the chequered flag `currentLapNum` does not increment**; only `lastLapTimeInMS` changes. Lap segmentation has
-  to close a lap on that change too. `resultStatus` becomes 3 (finished) at the same moment.
-- **Menus emit a few packets with `sessionUID` 0.** Ignore them.
+  to close a lap on that change too. `resultStatus` becomes 3 (finished) at the same moment. The change lands only
+  about 0.1 s before `SEND`, so at a UDP send rate of 20 Hz or lower LapData can miss it. The game's last
+  SessionHistory for the player, sent with `sessionUID` 0 just before `SEND`, holds that final lap time, and the
+  tracker falls back to it. Simulated on every committed recording at 30, 20 and 10 Hz; all recordings so far are
+  60 Hz, so a real 20 Hz recording is still worth checking.
+- **Menus emit a few packets with `sessionUID` 0.** Ignore them, except that last SessionHistory.
 - **Flashbacks:** the `FLBK` event carries the target frame and is sent with the pre-rewind frame id in its header.
   After the game resumes, `frameIdentifier` restarts from the target while `overallFrameIdentifier` keeps counting.
   The game is paused in between, so there's a gap in the stream with no telemetry. Flashbacks can be chained, sending
-  decreasing frame ids, and they also undo damage (a 44% wing became 0%).
+  decreasing frame ids, and they also undo damage (a 44% wing became 0%). `sessionTime` rewinds too, and the game can
+  resume up to a second before the target it announced. A flashback back over the line takes `currentLapNum` back
+  down, and one after a disqualification (`resultStatus` 5) makes the car active (2) again.
 - **`lapDistance` is negative before the start line** (−1333 at the start of a Monza Time Trial lap), but on a race
   grid it can be either sign (+297.9 at Monza, −60 at Melbourne).
+- **The lap number doesn't always move at the line.** Practice and qualifying keep it across the out lap, and a Time
+  Trial restart resets the lap timer and puts the car on a run-up whose `lapDistance` wraps to 0 at the line with no
+  new lap number. Separately, the lap timer now and then steps back a few milliseconds on its own.
 - **Pit stops:** `pitStatus` goes 1 (lane) → 2 (box) → 1 → 0 and `driverStatus` 2 (in lap) → 3 (out lap) → 4 (on
   track). The compound change, tyre age reset and wing repairs all happen while `pitStatus` is 2. New tyres come on
   cold, around 32 °C.
