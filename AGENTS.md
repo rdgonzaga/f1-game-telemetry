@@ -20,11 +20,19 @@ uv run mypy              # strict type check
 Frontend (once `frontend/` exists), run from `frontend/`: `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`.
 CI (`.github/workflows/ci.yml`) runs every command above and skips a side whose directory doesn't exist yet.
 
+Run the app (UDP listener, session tracking and saving, API) and open the dashboard:
+
+```sh
+uv run f1telemetry                    # --no-browser, --network for PS5/Xbox, --data-dir, --udp-port, --port
+```
+
+Sessions and `settings.json` live in `%LOCALAPPDATA%\F1Telemetry` (Windows) or `~/.local/share/f1telemetry`.
+
 Record and replay game UDP without the game running:
 
 ```sh
-uv run python tools/record_raw.py --out recordings/lap.f1raw
-uv run python tools/replay_raw.py recordings/lap.f1raw --speed 2
+uv run f1telemetry record --out recordings/lap.f1raw
+uv run f1telemetry replay recordings/lap.f1raw --speed 2
 uv run python tools/inspect_raw.py recordings/lap.f1raw     # sizes, sessions, events, lap/pit/tyre timeline
 uv run python tools/trim_raw.py recordings/lap.f1raw tests/fixtures/x.f1raw --start 60 --end 61
 uv run python tools/bench_parse.py                            # parse time per packet type
@@ -32,8 +40,8 @@ uv run python tools/bench_parse.py                            # parse time per p
 
 ## Layout
 
-- `f1telemetry/` backend package (`rawfile.py` = `.f1raw` recording format, `listener.py` + `live.py` = UDP intake and live state, `tracker.py` = session and lap tracking, `store.py` = saved sessions)
-- `tools/` developer scripts (UDP recorder, replayer, inspector, trimmer and parse benchmark)
+- `f1telemetry/` backend package (`cli.py` = the `f1telemetry` command, `app.py` = FastAPI server, `settings.py`, `rawfile.py` = `.f1raw` recording format, `recorder.py` + `replayer.py`, `listener.py` + `live.py` = UDP intake and live state, `tracker.py` = session and lap tracking, `store.py` = saved sessions)
+- `tools/` developer scripts (inspector, trimmer and parse benchmark)
 - `docs/udp-spec.md` packet layouts, format differences and real-game behaviour the backend relies on
 - `tests/` pytest suite; small committed recordings go in `tests/fixtures/` (see its README)
 - `recordings/`, `data/` local, gitignored
