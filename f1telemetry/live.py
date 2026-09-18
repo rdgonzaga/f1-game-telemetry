@@ -79,8 +79,13 @@ class LiveState:
             self._rate_count += 1
 
     def update(self, packet: Packet) -> None:
-        """Store a parsed packet's payload. A payload of None (no player car) only updates the header fields."""
+        """Store a parsed packet's payload. A payload of None (no player car) only updates the header fields.
+
+        Packets with `sessionUID` 0 (menus, and a burst as a session ends) are skipped so they don't wipe what's shown.
+        """
         header = packet.header
+        if header.session_uid == 0:
+            return
         if header.session_uid != self.session_uid:
             # A new session, or a switch between UDP format 2025 and 2026, must not be read as a mix of both.
             self.session_uid = header.session_uid

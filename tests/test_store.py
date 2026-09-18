@@ -165,16 +165,43 @@ def test_reopened_lap_is_removed_until_it_completes_again(tmp_path: Path) -> Non
     assert store.load_lap(session_id, 6)["lap_time_ms"] == 97_495
 
 
-def test_session_without_laps_is_not_kept(tmp_path: Path) -> None:
+def test_nothing_is_written_before_the_first_lap(tmp_path: Path) -> None:
     rec, store, executor = recorder(tmp_path)
     session = make_session()
     rec.on_event(SessionOpened(session))
-    executor.run()
-    assert len(store.list_sessions()) == 1
-
     rec.on_event(SessionClosed(session, "new session"))
-    executor.run()
+
+    # A crash any time before the first lap would leave nothing on disk either.
+    assert executor.queue == []
     assert store.list_sessions() == []
+
+
+def test_session_whose_only_lap_was_undone_is_removed(tmp_path: Path) -> None:
+    rec, store, executor = recorder(tmp_path)
+    session = make_session()
+    rec.on_event(SessionOpened(session))
+    lap = make_lap(1, 90_000)
+    session.laps.append(lap)
+    rec.on_event(LapCompleted(session, lap))
+    session.laps.pop()
+    rec.on_event(LapReopened(session, lap.reopened()))
+    rec.on_event(SessionClosed(session, "shutdown"))
+    executor.run()
+
+    assert store.list_sessions() == []
+    assert list(store.root.iterdir()) == []
+
+
+def test_active_session_id_follows_the_open_session(tmp_path: Path) -> None:
+    rec, _, _ = recorder(tmp_path)
+    session = make_session()
+    assert rec.active_session_id is None
+
+    rec.on_event(SessionOpened(session))
+    assert rec.active_session_id == "20260918-231502_monza_race"
+
+    rec.on_event(SessionClosed(session, "ended"))
+    assert rec.active_session_id is None
 
 
 def test_sessions_opened_in_the_same_second_get_distinct_ids(tmp_path: Path) -> None:

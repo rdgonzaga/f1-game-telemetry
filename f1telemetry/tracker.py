@@ -176,7 +176,8 @@ class SessionTracker:
         self.on_event = on_event
         self.session: TrackedSession | None = None
         self.lap: Lap | None = None
-        self._closed_uid: int | None = None
+        # Every closed UID, not just the last: a stray packet from any of them must not reopen it.
+        self._closed_uids: set[int] = set()
         self._lap_data: LapData | None = None
         # Lap number of the lap closed at the flag; a new lap only opens once the game moves past it.
         self._closed_lap_number: int | None = None
@@ -188,7 +189,7 @@ class SessionTracker:
     def update(self, packet: Packet) -> None:
         header = packet.header
         uid = header.session_uid
-        if uid == 0 or uid == self._closed_uid:
+        if uid == 0 or uid in self._closed_uids:
             # A session's last SessionHistory, with the final lap time, comes with UID 0 just before SEND.
             if uid == 0 and self.session is not None and isinstance(packet.data, SessionHistory):
                 self._history = packet.data.lap_times_ms
@@ -237,7 +238,7 @@ class SessionTracker:
         lap = self.lap
         if lap is not None and lap.number <= len(self._history) and self._history[lap.number - 1]:
             self._complete(lap, self._history[lap.number - 1], self._lap_data_time)
-        self._closed_uid = session.uid
+        self._closed_uids.add(session.uid)
         self.session = None
         self.lap = None
         self._lap_data = None
@@ -289,8 +290,9 @@ class SessionTracker:
             return True  # Time Trial restart
         session = self.session
         assert session is not None
+        track_length = session.info.track_length
         # Across the line from a Time Trial restart's run-up; the lap number doesn't change.
-        return previous.lap_distance - lap_data.lap_distance > PARTIAL_LAP_SHARE * session.info.track_length
+        return track_length > 0 and previous.lap_distance - lap_data.lap_distance > PARTIAL_LAP_SHARE * track_length
 
     def _complete(self, lap: Lap, lap_time_ms: int, session_time: float) -> None:
         session = self.session

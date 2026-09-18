@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import socket
 import time
 from pathlib import Path
+
+import pytest
 
 from f1telemetry.car_damage import CarDamage
 from f1telemetry.car_status import CarStatus
@@ -14,12 +17,14 @@ from f1telemetry.car_telemetry2 import CarTelemetry2
 from f1telemetry.lap_data import LapData
 from f1telemetry.listener import TelemetryProtocol, open_listener
 from f1telemetry.live import CONNECTED_TIMEOUT_NS, NS_PER_SECOND, LiveState
-from f1telemetry.packets import PACKET_ID_OFFSET, PacketId
+from f1telemetry.packets import PACKET_ID_OFFSET, Packet, PacketId
 from f1telemetry.rawfile import read_records
 from f1telemetry.session import Session
+from f1telemetry.tracker import SessionTracker
 
 FIXTURES = Path(__file__).parent / "fixtures"
 ADDR = ("127.0.0.1", 20777)
+SESSION_UID_OFFSET = 7  # after format u16, year, major, minor, packet version and packet id
 
 
 def datagrams(name: str) -> list[bytes]:
@@ -96,6 +101,40 @@ def test_new_session_uid_clears_stored_packets() -> None:
     assert state.status is None
     assert state.damage is None
     assert state.telemetry2 is None
+
+
+def test_uid_zero_packets_keep_the_stored_packets() -> None:
+    packets = datagrams("race-2026-monza-finish")
+    state = LiveState()
+    # The fixture already ends with the UID-0 SessionHistory burst sent before SEND.
+    feed(state, packets)
+    uid, telemetry = state.session_uid, state.telemetry
+    assert telemetry is not None
+
+    menu = bytearray(first_of(packets, PacketId.CAR_TELEMETRY))
+    menu[SESSION_UID_OFFSET : SESSION_UID_OFFSET + 8] = bytes(8)
+    feed(state, [bytes(menu)])
+
+    assert (state.session_uid, state.telemetry) == (uid, telemetry)
+    assert state.packets_seen == len(packets) + 1
+
+
+def test_error_while_handling_a_packet_is_logged_once(caplog: pytest.LogCaptureFixture) -> None:
+    class Broken(SessionTracker):
+        def update(self, packet: Packet) -> None:
+            raise RuntimeError("tracker bug")
+
+    state = LiveState()
+    protocol = TelemetryProtocol(state, tracker=Broken())
+    packets = datagrams("race-2026-monza-finish")[:50]
+    with caplog.at_level(logging.ERROR):
+        for data in packets:
+            protocol.datagram_received(data, ADDR)
+
+    assert protocol.errors > 1
+    assert len([r for r in caplog.records if "still listening" in r.message]) == 1
+    # Live state keeps updating: the error came after it.
+    assert state.telemetry is not None and state.packets_seen == 50
 
 
 def test_connection_status_expires_after_a_second() -> None:

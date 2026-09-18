@@ -203,7 +203,8 @@ class SessionRecorder:
     """Saves what `SessionTracker` reports. Pass `on_event` as the tracker's callback; call `close()` on shutdown.
 
     Runs on the event loop and only builds small summaries there. Laps are handed to the writer thread as they are:
-    the tracker never changes a completed lap, so the thread can read its samples safely.
+    the tracker never changes a completed lap, so the thread can read its samples safely. Nothing is written until a
+    session's first lap completes, so a restart or a crash before then leaves nothing behind.
     """
 
     def __init__(
@@ -216,6 +217,7 @@ class SessionRecorder:
         self._executor = executor or ThreadPoolExecutor(max_workers=1, thread_name_prefix="session-store")
         self._clock = clock
         self._session_id: str | None = None
+        self._written = False  # whether the current session has a folder on disk yet
         self._started_at = clock()
         # Ids are timestamped to the second, so only a restart within the same second can repeat one.
         self._used_ids: set[str] = set()
@@ -224,7 +226,7 @@ class SessionRecorder:
         if isinstance(event, SessionOpened):
             self._started_at = self._clock()
             self._session_id = self._new_session_id(event.session)
-            self._save_session(event.session)
+            self._written = False
             return
         session_id = self._session_id
         if session_id is None:
@@ -234,16 +236,22 @@ class SessionRecorder:
             lap = event.lap
             self._submit(_write_lap, folder / LAPS_DIR / lap_file_name(lap.number), lap)
             self._save_session(event.session)
-        elif isinstance(event, LapReopened):
+            self._written = True
+        elif isinstance(event, LapReopened) and self._written:
             self._submit(_unlink, folder / LAPS_DIR / lap_file_name(event.lap.number))
             self._save_session(event.session)
         elif isinstance(event, SessionClosed):
             self._session_id = None
             if event.session.laps:
                 self._save_session(event.session, session_id, self._clock(), event.reason)
-            else:
-                # Nothing to review: a restart before the first lap, or a session quit early.
+            elif self._written:
+                # Its only laps were undone by flashbacks, so there is nothing left to review.
                 self._submit(_remove_dir, folder)
+
+    @property
+    def active_session_id(self) -> str | None:
+        """The session being recorded, which must not be deleted while it is still being written."""
+        return self._session_id
 
     def close(self) -> None:
         """Wait for pending writes to finish."""
