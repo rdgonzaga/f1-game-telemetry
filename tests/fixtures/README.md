@@ -2,7 +2,7 @@
 
 Real F1 25 v1.26 recordings, cut with `tools/trim_raw.py` to the packets the parsers use, at full game rate (60 Hz).
 `race-2026-monza-finish` was cut again once SessionHistory was parsed, so it holds the final lap time sent before SEND.
-Timestamps are rebased to 0, so they replay with `tools/replay_raw.py`.
+Timestamps are rebased to 0, so they replay with `f1telemetry replay`.
 
 | Fixture | Content | Cut from |
 |---|---|---|
