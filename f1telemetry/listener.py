@@ -35,14 +35,21 @@ class TelemetryProtocol(asyncio.DatagramProtocol):
         self._parse = (dispatcher or make_dispatcher()).parse
         self._clock = time.monotonic_ns
         self._warned = False
+        self.errors = 0  # packets whose handling raised
 
     def datagram_received(self, data: bytes, addr: object) -> None:
         self.state.note_datagram(self._clock())
-        packet = self._parse(data)
-        if packet is not None:
-            self.state.update(packet)
-            if self.tracker is not None:
-                self.tracker.update(packet)
+        try:
+            packet = self._parse(data)
+            if packet is not None:
+                self.state.update(packet)
+                if self.tracker is not None:
+                    self.tracker.update(packet)
+        except Exception:
+            # A bug must not take intake down or log a traceback 60 times a second: log the first, count the rest.
+            self.errors += 1
+            if self.errors == 1:
+                log.exception("error handling a packet, still listening")
 
     def error_received(self, exc: Exception) -> None:
         # Windows reports ICMP port-unreachable on UDP sockets; nothing to do but keep listening.
