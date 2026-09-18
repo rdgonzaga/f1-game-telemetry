@@ -4,14 +4,31 @@ version = "0.0.0"
 description = "Localhost telemetry dashboard for F1 25 and the 2026 Season Pack"
 readme = "README.md"
 license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.141.1",
+    "uvicorn>=0.53.0",
+]
 
 [dependency-groups]
-dev = ["mypy", "pytest", "ruff"]
+dev = [
+    "httpx2>=2.13.0",
+    "mypy",
+    "pytest",
+    "ruff",
+]
 
-[tool.uv]
-package = false
+[project.scripts]
+f1telemetry = "f1telemetry.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "f1telemetry"
+module-root = ""
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -25,7 +42,7 @@ target-version = "py312"
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["bench_parse", "f1telemetry", "inspect_raw", "record_raw", "replay_raw", "trim_raw"]
+known-first-party = ["bench_parse", "f1telemetry", "inspect_raw", "trim_raw"]
 
 [tool.mypy]
 python_version = "3.12"
