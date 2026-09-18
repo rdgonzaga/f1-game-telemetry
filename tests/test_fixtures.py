@@ -64,7 +64,8 @@ def test_fixture_decodes_fully(name: str) -> None:
     headers = [packet.header for _, packet in packets]
     assert {h.packet_format for h in headers} == {packet_format}
     assert {h.player_car_index for h in headers} == {player}
-    assert len({h.session_uid for h in headers}) == 1
+    # UID 0 only on the SessionHistory the game sends just before SEND.
+    assert len({h.session_uid for h in headers} - {0}) == 1
     for kind in (Session, LapData, CarTelemetry, CarStatus, CarDamage):
         assert of_type(packets, kind), f"no {kind.__name__} packets"
     assert bool(of_type(packets, CarTelemetry2)) == (packet_format == 2026)
