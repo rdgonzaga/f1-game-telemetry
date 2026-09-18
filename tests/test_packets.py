@@ -110,6 +110,8 @@ def test_unknown_format_warns_once(caplog: pytest.LogCaptureFixture) -> None:
         assert dispatcher.parse(packet) is None
     assert len(caplog.records) == 1
     assert "2024" in caplog.records[0].getMessage()
+    # Kept for the setup screen, which tells the player to change the game's UDP Format.
+    assert dispatcher.last_warning == caplog.records[0].getMessage()
 
 
 def test_wrong_size_warns_once_then_valid_packets_still_parse(caplog: pytest.LogCaptureFixture) -> None:

@@ -125,6 +125,8 @@ class PacketDispatcher:
     def __init__(self) -> None:
         self._routes: dict[int, dict[int, tuple[Parser, int]]] = {fmt: {} for fmt in FORMATS}
         self._warned: set[tuple[object, ...]] = set()
+        # The most recent problem with incoming packets (wrong UDP format, wrong size), for the setup screen.
+        self.last_warning: str | None = None
 
     def register(self, packet_id: PacketId, parser: Parser, formats: Iterable[int] | None = None) -> None:
         """Register `parser` for `packet_id`; by default for every format that defines that packet."""
@@ -177,3 +179,4 @@ class PacketDispatcher:
         if key not in self._warned:
             self._warned.add(key)
             log.warning(message, *args)
+            self.last_warning = message % args

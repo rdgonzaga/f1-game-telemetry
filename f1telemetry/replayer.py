@@ -1,17 +1,10 @@
-"""Replay an `.f1raw` recording to a UDP port with original timing.
-
-Usage: uv run python tools/replay_raw.py recordings/x.f1raw [--speed 2] [--host 127.0.0.1] [--port 20777]
-"""
+"""Replay an `.f1raw` recording to a UDP port with its original timing, standing in for the game."""
 
 from __future__ import annotations
 
-import argparse
 import socket
-import sys
 import time
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from f1telemetry.rawfile import read_records
 
@@ -41,27 +34,3 @@ def replay(path: Path, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, speed
                 pass
             count += 1
     return count
-
-
-def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("path", type=Path)
-    parser.add_argument("--host", default=DEFAULT_HOST)
-    parser.add_argument("--port", type=int, default=DEFAULT_PORT)
-    parser.add_argument("--speed", type=float, default=1.0, help="playback multiplier (2 = twice as fast)")
-    args = parser.parse_args(argv)
-
-    if args.speed <= 0:
-        parser.error("--speed must be > 0")
-
-    print(f"Replaying {args.path} -> {args.host}:{args.port} at {args.speed}x (Ctrl+C to stop)")
-    try:
-        count = replay(args.path, args.host, args.port, args.speed)
-    except KeyboardInterrupt:
-        print("Stopped")
-        return
-    print(f"Sent {count} packets")
-
-
-if __name__ == "__main__":
-    main()

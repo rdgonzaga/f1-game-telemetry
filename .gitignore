@@ -16,6 +16,9 @@ dist/
 *.tsbuildinfo
 npm-debug.log*
 
+# Built dashboard, served by the app (npm run build writes it)
+f1telemetry/web/
+
 # Telemetry data (local sessions and raw recordings)
 data/
 recordings/

@@ -12,8 +12,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 from f1telemetry.packets import HEADER, PACKET_ID_OFFSET, PacketId
 from f1telemetry.rawfile import FILE_HEADER, MAGIC, RawFileError, RawWriter, read_records
-from record_raw import record
-from replay_raw import replay
+from f1telemetry.recorder import record
+from f1telemetry.replayer import replay
 from trim_raw import trim
 
 PACKETS = [(0, b"\x01" * 29), (5_000_000, b"\x02" * 1448), (40_000_000, b"\x03" * 269)]
@@ -104,6 +104,15 @@ def test_record_then_replay_roundtrip(tmp_path: Path) -> None:
     assert [data for _, data in recorded] == [data for _, data in PACKETS]
     assert recorded[0][0] == 0
     assert [t for t, _ in recorded] == sorted(t for t, _ in recorded)
+
+
+def test_record_refuses_to_replace_an_existing_file(tmp_path: Path) -> None:
+    out = write_file(tmp_path / "earlier.f1raw")
+    before = out.read_bytes()
+
+    with pytest.raises(FileExistsError):
+        record(out, port=free_udp_port())
+    assert out.read_bytes() == before
 
 
 def fake_packet(packet_id: int, tag: int) -> bytes:
