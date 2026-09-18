@@ -193,6 +193,34 @@ def test_packets_after_send_do_not_reopen_the_session() -> None:
     assert game.of_type(SessionClosed)[0].reason == "ended"
 
 
+def test_stray_packet_from_an_older_session_is_ignored() -> None:
+    game = Game()
+    for uid in (UID, 0x5678):
+        game.uid = uid
+        game.start()
+        game.send(PacketId.EVENT, SESSION_ENDED)
+    game.uid = 0x9ABC
+    game.start()
+    game.drive_lap(1)
+
+    # A late packet from the first session, after two more have opened.
+    game.send(PacketId.SESSION, SESSION, uid=UID)
+
+    assert [type(event) for event in game.events] == [SessionOpened, SessionClosed] * 2 + [SessionOpened]
+    assert game.tracker.session is not None and game.tracker.session.uid == 0x9ABC
+
+
+def test_run_up_restart_check_is_skipped_without_a_track_length() -> None:
+    game = Game()
+    game.send(PacketId.SESSION, SESSION._replace(track_length=0))
+    game.frame(1, 900.0, 10_000)
+    game.frame(1, 899.0, 10_016)
+
+    lap = game.tracker.lap
+    assert lap is not None
+    assert list(lap.samples.lap_distance) == [900.0, 899.0]
+
+
 def test_close_ends_the_open_session_and_drops_the_unfinished_lap() -> None:
     game = Game()
     game.start()
