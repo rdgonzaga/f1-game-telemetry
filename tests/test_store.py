@@ -293,3 +293,60 @@ def test_default_data_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
     monkeypatch.setattr("sys.platform", "linux")
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
     assert default_data_dir() == tmp_path / "xdg" / "f1telemetry"
+
+
+def test_recorder_document_follows_the_session(tmp_path: Path) -> None:
+    rec, _, executor = recorder(tmp_path)
+    session = make_session()
+    assert rec.document is None
+
+    rec.on_event(SessionOpened(session))
+    assert rec.document is not None
+    assert (rec.document["id"], rec.document["laps"], rec.document["ended_at"]) == (
+        "20260918-231502_monza_race",
+        [],
+        None,
+    )
+
+    lap = make_lap(1, 90_000)
+    session.laps.append(lap)
+    rec.on_event(LapCompleted(session, lap))
+    assert [lap["number"] for lap in rec.document["laps"]] == [1]
+
+    session.laps.pop()
+    rec.on_event(LapReopened(session, lap.reopened()))
+    assert rec.document["laps"] == []
+
+    rec.on_event(SessionClosed(session, "shutdown"))
+    # Kept after the close, now with its end, even though nothing is saved for a session without laps.
+    assert (rec.document["end_reason"], rec.document["ended_at"]) == ("shutdown", "2026-09-18T23:15:02")
+    executor.run()
+    assert SessionStore(tmp_path).list_sessions() == []
+
+
+def test_delete_waits_for_writes_still_pending(tmp_path: Path) -> None:
+    rec, store, executor = recorder(tmp_path)
+    session = make_session()
+    rec.on_event(SessionOpened(session))
+    session.laps.append(make_lap(1, 90_000))
+    rec.on_event(LapCompleted(session, session.laps[0]))
+    rec.on_event(SessionClosed(session, "ended"))
+
+    # The session's files are still queued; deleting now must not have them written back afterwards.
+    deleted = rec.delete("20260918-231502_monza_race")
+    executor.run()
+
+    assert deleted.done() and deleted.exception() is None
+    assert store.list_sessions() == []
+    assert list(store.root.iterdir()) == []
+
+
+def test_lap_bytes_are_the_saved_file(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path)
+    session_id = "20260101-120000_monza_race"
+    write_json_atomic(store.root / session_id / "laps" / "lap_03.json", {"number": 3})
+
+    assert store.lap_bytes(session_id, 3) == (store.root / session_id / "laps" / "lap_03.json").read_bytes()
+    assert store.load_lap(session_id, 3) == {"number": 3}
+    with pytest.raises(KeyError):
+        store.lap_bytes(session_id, 4)
