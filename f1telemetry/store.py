@@ -175,8 +175,15 @@ class SessionStore:
 
     def load_lap(self, session_id: str, number: int) -> Json:
         """Raises KeyError when there is no such session or lap."""
+        return _json(self.lap_bytes(session_id, number))
+
+    def lap_bytes(self, session_id: str, number: int) -> bytes:
+        """A lap file as saved, for serving without parsing it. Raises KeyError when there is no such session or lap."""
         path = self.session_dir(session_id) / LAPS_DIR / lap_file_name(number)
-        return _read_or_key_error(path, f"{session_id} lap {number}")
+        try:
+            return path.read_bytes()
+        except FileNotFoundError:
+            raise KeyError(f"{session_id} lap {number}") from None
 
     def delete_session(self, session_id: str) -> None:
         """Raises KeyError when there is no such session."""
@@ -189,6 +196,11 @@ class SessionStore:
 def _read(path: Path) -> Json:
     with path.open(encoding="utf-8") as file:
         document: Json = json.load(file)
+    return document
+
+
+def _json(data: bytes) -> Json:
+    document: Json = json.loads(data)
     return document
 
 
@@ -218,6 +230,9 @@ class SessionRecorder:
         self._clock = clock
         self._session_id: str | None = None
         self._written = False  # whether the current session has a folder on disk yet
+        # The current session's summary as last built, in the saved `session.json` shape (the live feed sends it).
+        # Kept after the session closes, then holding its end.
+        self.document: Json | None = None
         self._started_at = clock()
         # Ids are timestamped to the second, so only a restart within the same second can repeat one.
         self._used_ids: set[str] = set()
@@ -227,6 +242,7 @@ class SessionRecorder:
             self._started_at = self._clock()
             self._session_id = self._new_session_id(event.session)
             self._written = False
+            self.document = session_document(self._session_id, event.session, self._started_at)
             return
         session_id = self._session_id
         if session_id is None:
@@ -237,21 +253,34 @@ class SessionRecorder:
             self._submit(_write_lap, folder / LAPS_DIR / lap_file_name(lap.number), lap)
             self._save_session(event.session)
             self._written = True
-        elif isinstance(event, LapReopened) and self._written:
-            self._submit(_unlink, folder / LAPS_DIR / lap_file_name(event.lap.number))
-            self._save_session(event.session)
+        elif isinstance(event, LapReopened):
+            if self._written:
+                self._submit(_unlink, folder / LAPS_DIR / lap_file_name(event.lap.number))
+                self._save_session(event.session)
+            else:
+                self.document = session_document(session_id, event.session, self._started_at)
         elif isinstance(event, SessionClosed):
             self._session_id = None
+            ended_at = self._clock()
             if event.session.laps:
-                self._save_session(event.session, session_id, self._clock(), event.reason)
-            elif self._written:
-                # Its only laps were undone by flashbacks, so there is nothing left to review.
-                self._submit(_remove_dir, folder)
+                self._save_session(event.session, session_id, ended_at, event.reason)
+            else:
+                self.document = session_document(session_id, event.session, self._started_at, ended_at, event.reason)
+                if self._written:
+                    # Its only laps were undone by flashbacks, so there is nothing left to review.
+                    self._submit(_remove_dir, folder)
 
     @property
     def active_session_id(self) -> str | None:
         """The session being recorded, which must not be deleted while it is still being written."""
         return self._session_id
+
+    def delete(self, session_id: str) -> Future[None]:
+        """Delete a saved session on the writer thread, after any writes still pending for it.
+
+        The future raises KeyError when there is no such session. Refuse the active session before calling this.
+        """
+        return self._executor.submit(self.store.delete_session, session_id)
 
     def close(self) -> None:
         """Wait for pending writes to finish."""
@@ -275,7 +304,7 @@ class SessionRecorder:
     ) -> None:
         session_id = session_id or self._session_id
         assert session_id is not None
-        document = session_document(session_id, session, self._started_at, ended_at, end_reason)
+        document = self.document = session_document(session_id, session, self._started_at, ended_at, end_reason)
         self._submit(write_json_atomic, self.store.root / session_id / SESSION_FILE, document)
 
     def _submit(self, fn: Callable[..., object], *args: object) -> None:

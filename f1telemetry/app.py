@@ -1,4 +1,7 @@
-"""The app server: FastAPI on the same asyncio loop as the UDP listener, session tracker and recorder.
+"""The app server: FastAPI on the same asyncio loop as the UDP listener, session tracker, recorder and live feed.
+
+Endpoints: `/ws/live` (see `live_feed`), `/api/sessions` to list, load and delete saved sessions and laps, and
+`/api/setup` for the connection screen.
 
 `create_app` builds the app and `make_server` wraps it in a uvicorn server. The CLI runs that server on the main
 thread; `ServerThread` runs it on a background thread and stops it from code, which the desktop window app needs.
@@ -16,17 +19,18 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from pydantic import BaseModel
 
 from f1telemetry.listener import TelemetryProtocol, open_listener
 from f1telemetry.live import LiveState
+from f1telemetry.live_feed import FeedClient, LiveFeed
 from f1telemetry.parsers import make_dispatcher
 from f1telemetry.settings import ListenMode, Settings, lan_ipv4_addresses
-from f1telemetry.store import SessionRecorder, SessionStore
-from f1telemetry.tracker import SessionTracker
+from f1telemetry.store import Json, SessionRecorder, SessionStore
+from f1telemetry.tracker import SessionTracker, TrackerEvent
 
 log = logging.getLogger(__name__)
 
@@ -37,18 +41,25 @@ DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 
 class Telemetry:
-    """The UDP side: listener, live state, session tracker and recorder. The app's lifespan starts and stops it."""
+    """The UDP side: listener, live state, session tracker, recorder and live feed. The app's lifespan runs it."""
 
     def __init__(self, settings: Settings, data_dir: Path) -> None:
         self.settings = settings
         self.state = LiveState()
         self.store = SessionStore(data_dir)
         self.recorder = SessionRecorder(self.store)
-        self.tracker = SessionTracker(self.recorder.on_event)
+        self.feed = LiveFeed(self.state, self.recorder)
+        self.tracker = SessionTracker(self._on_tracker_event)
         self.dispatcher = make_dispatcher()
         self.protocol: TelemetryProtocol | None = None
         self.udp_port = settings.udp_port  # the bound port once started; differs when settings ask for port 0
         self._transport: asyncio.DatagramTransport | None = None
+        self._feed_task: asyncio.Task[None] | None = None
+
+    def _on_tracker_event(self, event: TrackerEvent) -> None:
+        # Recorder first: the feed sends the session summary the recorder just built.
+        self.recorder.on_event(event)
+        self.feed.on_event(event)
 
     async def start(self) -> None:
         host = self.settings.udp_host
@@ -70,6 +81,7 @@ class Telemetry:
         self.protocol = protocol
         self.udp_port = transport.get_extra_info("sockname")[1]
         log.info("Listening for game telemetry on UDP %s:%d", host, self.udp_port)
+        self._feed_task = asyncio.create_task(self.feed.run(), name="live-feed")
 
     async def stop(self) -> None:
         """Stop listening, then close the open session before the recorder so its final write isn't lost."""
@@ -77,6 +89,11 @@ class Telemetry:
             self._transport.close()
             self._transport = None
         self.tracker.close()
+        if self._feed_task is not None:
+            self._feed_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._feed_task
+            self._feed_task = None
         await asyncio.to_thread(self.recorder.close)
 
 
@@ -123,8 +140,81 @@ def create_app(telemetry: Telemetry, web_dir: Path = WEB_DIR) -> FastAPI:
             packet_errors=protocol.errors if protocol is not None else 0,
         )
 
+    _add_sessions(app, telemetry)
+    _add_live(app, telemetry.feed)
     _add_frontend(app, web_dir)
     return app
+
+
+def _with_status(session: Json, active_session_id: str | None) -> Json:
+    """Add `status`: `recording`, `complete`, or `interrupted` for one the app stopped writing without ending it."""
+    if session.get("id") == active_session_id:
+        status = "recording"
+    elif session.get("ended_at") is None:
+        status = "interrupted"
+    else:
+        status = "complete"
+    return {**session, "status": status}
+
+
+def _add_sessions(app: FastAPI, telemetry: Telemetry) -> None:
+    store, recorder = telemetry.store, telemetry.recorder
+
+    @app.get("/api/sessions")
+    async def list_sessions() -> list[Json]:
+        """Saved sessions, newest first."""
+        sessions = await asyncio.to_thread(store.list_sessions)
+        return [_with_status(session, recorder.active_session_id) for session in sessions]
+
+    @app.get("/api/sessions/{session_id}")
+    async def get_session(session_id: str) -> Json:
+        try:
+            session = await asyncio.to_thread(store.load_session, session_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="no such session") from None
+        return _with_status(session, recorder.active_session_id)
+
+    @app.get("/api/sessions/{session_id}/laps/{number}")
+    async def get_lap(session_id: str, number: int) -> Response:
+        """A lap's samples as columns, served as saved: laps run to hundreds of KB, so they aren't re-encoded."""
+        try:
+            data = await asyncio.to_thread(store.lap_bytes, session_id, number)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="no such lap") from None
+        return Response(data, media_type="application/json")
+
+    @app.delete("/api/sessions/{session_id}", status_code=204)
+    async def delete_session(session_id: str) -> None:
+        if session_id == recorder.active_session_id:
+            # The recorder would write it again with its next lap.
+            raise HTTPException(status_code=409, detail="the session is still being recorded")
+        try:
+            await asyncio.wrap_future(recorder.delete(session_id))
+        except KeyError:
+            raise HTTPException(status_code=404, detail="no such session") from None
+
+
+def _add_live(app: FastAPI, feed: LiveFeed) -> None:
+    @app.websocket("/ws/live")
+    async def live(websocket: WebSocket) -> None:
+        await websocket.accept()
+        client = feed.join()
+        sender = asyncio.create_task(_send_feed(websocket, client))
+        try:
+            # Nothing is expected from the dashboard; receiving only notices when it goes away.
+            while (await websocket.receive())["type"] != "websocket.disconnect":
+                pass
+        finally:
+            feed.leave(client)
+            sender.cancel()
+            # A send to a closed socket may have failed first; either way the client is gone.
+            await asyncio.gather(sender, return_exceptions=True)
+
+
+async def _send_feed(websocket: WebSocket, client: FeedClient) -> None:
+    while True:
+        for message in await client.next_messages():
+            await websocket.send_text(message)
 
 
 def _add_frontend(app: FastAPI, web_dir: Path) -> None:

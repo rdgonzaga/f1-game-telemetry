@@ -8,6 +8,7 @@ import time
 import urllib.request
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,7 +16,7 @@ from fastapi.testclient import TestClient
 from f1telemetry.app import ServerThread, Telemetry, create_app, make_server
 from f1telemetry.rawfile import read_records
 from f1telemetry.settings import Settings
-from f1telemetry.store import SessionStore
+from f1telemetry.store import SessionStore, write_json_atomic
 
 FIXTURES = Path(__file__).parent / "fixtures"
 # Port 0 everywhere: the OS picks free ports, so tests never collide with a running app or each other.
@@ -97,6 +98,107 @@ def test_open_session_is_closed_when_the_app_stops(tmp_path: Path) -> None:
     assert telemetry.recorder.active_session_id is None
     # No lap completed, so nothing is kept.
     assert SessionStore(tmp_path).list_sessions() == []
+
+
+def save_session(data_dir: Path, session_id: str, *, ended: bool = True) -> Path:
+    folder = SessionStore(data_dir).root / session_id
+    ended_at = "2026-09-18T23:30:00" if ended else None
+    write_json_atomic(folder / "session.json", {"id": session_id, "ended_at": ended_at, "laps": [{"number": 1}]})
+    write_json_atomic(folder / "laps" / "lap_01.json", {"number": 1, "columns": {"speed": [250, 251]}})
+    return folder
+
+
+def test_sessions_are_listed_newest_first_with_their_status(tmp_path: Path) -> None:
+    save_session(tmp_path, "20260918-231502_monza_race")
+    save_session(tmp_path, "20260919-101500_jeddah_race", ended=False)
+    test_client, _ = client(tmp_path)
+    with test_client:
+        sessions = test_client.get("/api/sessions").json()
+        one = test_client.get("/api/sessions/20260918-231502_monza_race").json()
+
+    assert [(s["id"], s["status"]) for s in sessions] == [
+        ("20260919-101500_jeddah_race", "interrupted"),
+        ("20260918-231502_monza_race", "complete"),
+    ]
+    assert one == {**sessions[1]}
+
+
+def test_a_lap_is_served_as_saved(tmp_path: Path) -> None:
+    folder = save_session(tmp_path, "20260918-231502_monza_race")
+    test_client, _ = client(tmp_path)
+    with test_client:
+        response = test_client.get("/api/sessions/20260918-231502_monza_race/laps/1")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/json"
+    assert response.content == (folder / "laps" / "lap_01.json").read_bytes()
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/sessions/20260101-000000_nowhere_race",
+        "/api/sessions/20260918-231502_monza_race/laps/2",
+        "/api/sessions/20260101-000000_nowhere_race/laps/1",
+        "/api/sessions/..%2F..%2Fsecret",
+    ],
+)
+def test_missing_sessions_and_laps_are_404(tmp_path: Path, path: str) -> None:
+    save_session(tmp_path, "20260918-231502_monza_race")
+    test_client, _ = client(tmp_path)
+    with test_client:
+        assert test_client.get(path).status_code == 404
+
+
+def test_delete_a_session(tmp_path: Path) -> None:
+    folder = save_session(tmp_path, "20260918-231502_monza_race")
+    test_client, _ = client(tmp_path)
+    with test_client:
+        assert test_client.delete("/api/sessions/20260918-231502_monza_race").status_code == 204
+        assert not folder.exists()
+        assert test_client.delete("/api/sessions/20260918-231502_monza_race").status_code == 404
+        assert test_client.get("/api/sessions").json() == []
+
+
+def test_the_session_being_recorded_cant_be_deleted(tmp_path: Path) -> None:
+    records = list(read_records(FIXTURES / "race-2026-monza-finish.f1raw"))
+    before_flag = [data for t, data in records if t < 600_000_000]
+    test_client, telemetry = client(tmp_path)
+    with test_client:
+        send(telemetry.udp_port, before_flag)
+        wait_for(lambda: telemetry.state.packets_seen == len(before_flag))
+        active = telemetry.recorder.active_session_id
+        assert active is not None
+        response = test_client.delete(f"/api/sessions/{active}")
+
+    assert response.status_code == 409
+
+
+def test_live_feed_streams_snapshots_and_session_events(tmp_path: Path) -> None:
+    packets = [data for _, data in read_records(FIXTURES / "race-2026-monza-finish.f1raw")]
+    test_client, telemetry = client(tmp_path)
+    with test_client, test_client.websocket_connect("/ws/live") as live:
+        hello, first = live.receive_json(), live.receive_json()
+        assert hello == {"type": "hello", "session": None}
+        assert (first["type"], first["connected"], first["telemetry"]) == ("snapshot", False, None)
+
+        send(telemetry.udp_port, packets)
+        events: list[dict[str, Any]] = []
+        # The burst can be handled within one tick, so the events may all come before the next snapshot.
+        while not events or events[-1]["type"] != "session_ended":
+            message = live.receive_json()
+            if message["type"] != "snapshot":
+                events.append(message)
+        snapshot = live.receive_json()
+        while snapshot["type"] != "snapshot":
+            snapshot = live.receive_json()
+
+    assert [m["type"] for m in events] == ["session_started", "lap_completed", "session_ended"]
+    assert (events[1]["lap"]["number"], events[1]["lap"]["lap_time_ms"]) == (3, 83561)
+    assert events[2]["session"]["id"] == events[0]["session"]["id"]
+    assert (snapshot["connected"], snapshot["packet_format"], snapshot["lap"]["current_lap_num"]) == (True, 2026, 3)
+    # The client left, so the feed stops sending to it.
+    assert telemetry.feed.clients == set()
 
 
 def test_without_a_built_frontend_the_root_explains(tmp_path: Path) -> None:
