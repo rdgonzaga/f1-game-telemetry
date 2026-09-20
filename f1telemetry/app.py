@@ -29,6 +29,7 @@ from f1telemetry.listener import TelemetryProtocol, open_listener
 from f1telemetry.live import LiveState
 from f1telemetry.live_feed import FeedClient, LiveFeed
 from f1telemetry.parsers import make_dispatcher
+from f1telemetry.schemas import CompareResult, ErrorDetail, LapDocument, SessionSummary
 from f1telemetry.settings import ListenMode, Settings, lan_ipv4_addresses
 from f1telemetry.store import Json, SessionRecorder, SessionStore
 from f1telemetry.tracker import SessionTracker, TrackerEvent
@@ -162,13 +163,17 @@ def _with_status(session: Json, active_session_id: str | None) -> Json:
 def _add_sessions(app: FastAPI, telemetry: Telemetry) -> None:
     store, recorder = telemetry.store, telemetry.recorder
 
-    @app.get("/api/sessions")
+    @app.get("/api/sessions", response_model=None, responses={200: {"model": list[SessionSummary]}})
     async def list_sessions() -> list[Json]:
         """Saved sessions, newest first."""
         sessions = await asyncio.to_thread(store.list_sessions)
         return [_with_status(session, recorder.active_session_id) for session in sessions]
 
-    @app.get("/api/sessions/{session_id}")
+    @app.get(
+        "/api/sessions/{session_id}",
+        response_model=None,
+        responses={200: {"model": SessionSummary}, 404: {"model": ErrorDetail}},
+    )
     async def get_session(session_id: str) -> Json:
         try:
             session = await asyncio.to_thread(store.load_session, session_id)
@@ -176,7 +181,11 @@ def _add_sessions(app: FastAPI, telemetry: Telemetry) -> None:
             raise HTTPException(status_code=404, detail="no such session") from None
         return _with_status(session, recorder.active_session_id)
 
-    @app.get("/api/sessions/{session_id}/laps/{number}")
+    @app.get(
+        "/api/sessions/{session_id}/laps/{number}",
+        response_model=None,
+        responses={200: {"model": LapDocument}, 404: {"model": ErrorDetail}},
+    )
     async def get_lap(session_id: str, number: int) -> Response:
         """A lap's samples as columns, served as saved: laps run to hundreds of KB, so they aren't re-encoded."""
         try:
@@ -185,7 +194,11 @@ def _add_sessions(app: FastAPI, telemetry: Telemetry) -> None:
             raise HTTPException(status_code=404, detail="no such lap") from None
         return Response(data, media_type="application/json")
 
-    @app.delete("/api/sessions/{session_id}", status_code=204)
+    @app.delete(
+        "/api/sessions/{session_id}",
+        status_code=204,
+        responses={404: {"model": ErrorDetail}, 409: {"model": ErrorDetail}},
+    )
     async def delete_session(session_id: str) -> None:
         if session_id == recorder.active_session_id:
             # The recorder would write it again with its next lap.
@@ -219,7 +232,11 @@ def _compare_documents(store: SessionStore, a: tuple[str, int], b: tuple[str, in
 
 
 def _add_compare(app: FastAPI, store: SessionStore) -> None:
-    @app.get("/api/compare")
+    @app.get(
+        "/api/compare",
+        response_model=None,
+        responses={200: {"model": CompareResult}, 400: {"model": ErrorDetail}, 404: {"model": ErrorDetail}},
+    )
     async def compare(session_a: str, lap_a: int, session_b: str, lap_b: int) -> Json:
         """Two laps on one 5 m distance grid, with the delta trace and 25 minisector gains."""
         try:
