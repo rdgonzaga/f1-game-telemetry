@@ -171,7 +171,8 @@
      The pairing works because Saira is squarish and wide while Iosevka is narrow; an earlier attempt
      paired Iosevka with Barlow Semi Condensed, and two narrow faces read as one inconsistent face.
      Both are self-hosted: the app runs on localhost and must not depend on the network. */
-  --f1-font-num: "Iosevka Web", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  /* "Iosevka" is the family Fontsource ships under; "Iosevka Web" is what Iosevka's own build names it. */
+  --f1-font-num: "Iosevka", "Iosevka Web", ui-monospace, "Cascadia Mono", Consolas, monospace;
   --f1-font-ui: "Saira", "Segoe UI", system-ui, -apple-system, sans-serif;
 
   /* Type scale. 16px base: an earlier pass ran 15px with 10px labels and was rejected as too small.
