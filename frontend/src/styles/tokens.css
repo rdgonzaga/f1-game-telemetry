@@ -1,0 +1,236 @@
+/* Design tokens for the F1 Game Telemetry dashboard.
+ *
+ * The single source of truth for colour, type, density and the numeric thresholds that drive state
+ * colour. Plain custom properties on purpose: this file is valid CSS on its own, so a mockup and the
+ * built app read exactly the same values. `theme.css` maps Tailwind's `@theme` and shadcn/ui's contract
+ * variables (--background, --card, --border, --ring) onto these as aliases, so shadcn components inherit
+ * the look without component edits. Canvas code (uPlot) reads the few it needs once at startup via
+ * getComputedStyle, never per frame.
+ *
+ * Direction: a race engineer's screen. Dense, data first, colour reserved for state. Dark is the only
+ * theme for now; a light theme redefines these same names and nothing else.
+ *
+ * Palette provenance: the greys and the red are Formula 1's own, eyedroppered off formula1.com. The
+ * timing colours are the sport's broadcast language (purple session best, green personal best, yellow
+ * slower), which is the strongest "this is F1" signal available and is real to the subject rather than
+ * decoration. See docs/design.md.
+ *
+ * Contrast is measured, not estimated (WCAG 2.1, worst case of the three surfaces below):
+ *   text-1 16.1:1, text-2 9.6:1, text-3 5.4:1 -- all clear AA for normal text.
+ *   Every state colour clears 4.5:1 EXCEPT --f1-accent (3.25:1) and --f1-text-disabled (3.14:1),
+ *   which are marks-and-large-text only. This is load bearing: see the warning on --f1-accent.
+ */
+
+:root {
+  /* ---- Surfaces ------------------------------------------------------------------------------
+     Near-neutral with a faint cool cast, so state colour is the only real hue on screen. Not pure
+     black: an OLED panel smears on near-black transitions and hairlines disappear into it. The steps
+     are close together (1.09:1 apart), which is deliberate -- separation comes from the border, not
+     from the fill. A panel is legible because it is outlined, not because it glows. */
+  --f1-surface-0: #0d0d13; /* app ground, behind everything */
+  --f1-surface-1: #17171f; /* panel / card */
+  --f1-surface-2: #20202a; /* hover, nested block, the track behind a bar */
+  --f1-surface-sunken: #101017; /* card header strip, table header, inset well */
+  --f1-surface-chart: #101017; /* plot area, a step darker so traces carry */
+  --f1-surface-overlay: #17171ff5; /* popover, tooltip, dialog ground */
+  --f1-scrim: #05070ab3; /* behind a dialog, ~70% so the panel below stops competing */
+
+  /* ---- Lines ---------------------------------------------------------------------------------
+     Hairlines carry the structure. Shadow is reserved for things that genuinely float.
+     --f1-border and --f1-border-soft are decorative separators and are intentionally below the 3:1
+     non-text floor; they never carry meaning on their own. --f1-border-control is the boundary of an
+     actual control (input, select, checkbox) and does clear 3:1 (3.36:1 worst case), as WCAG requires
+     for anything a user has to find and click. */
+  --f1-border: #2c2c38;
+  --f1-border-soft: #1f1f28; /* row rules and grid seams inside a panel */
+  --f1-border-hover: #3e3e4c; /* a card's border on hover, paired with a surface-2 fill */
+  --f1-border-control: #70708a;
+  --f1-focus: #6fb6ff; /* focus ring, 2px, never removed */
+  --f1-shadow-overlay: 0 8px 24px #04060a99;
+
+  /* ---- Text ----------------------------------------------------------------------------------
+     text-3 is the floor for anything a user has to read. An earlier pass used #8a8a93 for this and it
+     was rejected on sight as "too grey"; do not darken it back. */
+  --f1-text-1: #ffffff; /* values, headings */
+  --f1-text-2: #c7c7d2; /* body, secondary values */
+  --f1-text-3: #9295a3; /* labels, units, axis ticks */
+  --f1-text-disabled: #6a6d7c; /* disabled controls only; below AA by design, never for real content */
+  --f1-text-on-fill: #0d0d13; /* dark ink on a filled state chip */
+
+  /* ---- Brand -------------------------------------------------------------------------------- */
+  /* F1 red. WARNING: 3.25:1 at worst, so it is legal for marks, fills, rules and text at 24px+/19px
+     bold, and ILLEGAL for small text. A red label, a red unit, a red table cell -- all wrong. When
+     something red has to be read at body size, use --f1-critical instead. Kept scarce on purpose:
+     once red is everywhere it stops meaning anything. */
+  --f1-accent: #e10600;
+  --f1-accent-dim: #e1060033; /* braking bands, hero washes, the fill under a brake trace */
+
+  /* ---- Timing: the sport's own broadcast colours ---------------------------------------------
+     Fixed by Formula 1, not ours to reinterpret. A driver reads these faster than any label. */
+  --f1-timing-best: #bc63e5; /* session best */
+  --f1-timing-pb: #00d06c; /* personal best */
+  --f1-timing-slow: #f5c518; /* slower than your own best */
+  /* F1 broadcast purple is #b14fdb, which measures 3.85:1 on --f1-surface-2 and fails AA for the
+     small text it would actually carry (a lap time in a table). Lightened just far enough to pass
+     at 4.65:1 while still reading as the same colour. */
+
+  /* ---- Delta and status ----------------------------------------------------------------------
+     Gain/loss share hues with timing on purpose: green is "good" in both, yellow is "caution" in
+     both, so the two systems reinforce rather than compete. Loss is YELLOW, not red -- red belongs to
+     the car being in trouble, and a driver half a tenth down is not in trouble. */
+  --f1-gain: #00d06c; /* ahead of the reference */
+  --f1-loss: #f5c518; /* behind it */
+  --f1-neutral: #9295a3; /* inside the noise band, or nothing to compare against */
+  --f1-ok: #00d06c;
+  --f1-warn: #f5c518;
+  --f1-critical: #ff4747; /* the readable red: use this for red TEXT, never --f1-accent */
+  --f1-idle: #9295a3; /* connected but no packets: paused, or sitting in a menu */
+
+  /* ---- Temperature ramp ----------------------------------------------------------------------
+     Cold to critical. Thresholds live further down as numbers so CSS and TypeScript cannot drift. */
+  --f1-temp-cold: #6e8ca8;
+  --f1-temp-warming: #59a9a0;
+  --f1-temp-optimal: #00d06c;
+  --f1-temp-hot: #f0913a;
+  --f1-temp-critical: #ff4747;
+
+  /* ---- FIA flags, by the colours the sport already fixed ------------------------------------- */
+  --f1-flag-green: #00d06c;
+  --f1-flag-blue: #4a8fe8;
+  --f1-flag-yellow: #f5c518;
+  --f1-flag-red: #ff4747;
+
+  /* ---- Tyre compounds, matching the sidewall the game draws --------------------------------- */
+  --f1-tyre-soft: #e10600;
+  --f1-tyre-medium: #f5c518;
+  --f1-tyre-hard: #ededf2;
+  --f1-tyre-inter: #00d06c;
+  --f1-tyre-wet: #3a7bd5;
+
+  /* ---- Car systems. One hue each, so a glance separates them. ------------------------------- */
+  --f1-ers: #a970ff;
+  --f1-drs: #2dd4bf;
+  --f1-overtake: #f0913a;
+  --f1-aero-straight: #2dd4bf; /* 2026 active aero, low-drag state */
+  --f1-aero-corner: #9295a3; /* and its high-downforce state */
+  --f1-fuel: #d7c98a;
+
+  /* ---- Chart series --------------------------------------------------------------------------
+     THE COMPARE RULE, and the one thing in this file not to relitigate: when two laps are on screen,
+     the STROKE says which lap and the AREA FILL says which channel. An earlier pass coloured the
+     stroke by channel (speed white, throttle green, brake red) while the lap pickers coloured by lap,
+     so the two encodings fought and users could not tell which trace was theirs. Lap B is also DASHED,
+     so identity survives greyscale, a projector and colour blindness. Never colour alone. */
+  --f1-lap-a: #ffffff; /* the lap you are looking at: solid, 2.4px */
+  --f1-lap-b: #2dd4bf; /* the lap it is compared against: dashed 7 5, 2px */
+  --f1-lap-a-width: 2.4px;
+  --f1-lap-b-width: 2px;
+  --f1-lap-b-dash: 7 5;
+
+  /* Channel fills. These tint the area under a trace; they never own a stroke when two laps are up. */
+  --f1-chart-speed: #c7c7d2;
+  --f1-chart-throttle: #00d06c;
+  --f1-chart-brake: #e10600;
+  --f1-chart-steer: #7fb2ff;
+  --f1-chart-gear: #9295a3;
+  --f1-chart-rpm: #a970ff;
+  --f1-chart-drs: #2dd4bf;
+  --f1-chart-fill-opacity: 0.16;
+
+  --f1-chart-grid: #1f1f28;
+  --f1-chart-axis: #2c2c38;
+  --f1-chart-cursor: #6fb6ff;
+
+  /* ---- Thresholds ----------------------------------------------------------------------------
+     Unitless so TypeScript can read them with parseFloat and agree with the CSS. Measured from the
+     recordings, not from folklore. */
+
+  /* Tyre temperature, in Celsius. Across three races the CARCASS (inner) stays inside 69-97 C while
+     the SURFACE swings 43-152 C within a single lap. Colour therefore tracks the carcass; the surface
+     is shown as a second, uncoloured number. Colouring the surface makes the widget strobe. */
+  --f1-tyre-inner-cold: 78; /* below this: cold */
+  --f1-tyre-inner-warming: 84; /* below: warming */
+  --f1-tyre-inner-optimal: 96; /* below: optimal */
+  --f1-tyre-inner-hot: 100; /* below: hot, at or above: critical */
+
+  /* Brake temperature, same recordings: range 21-1011 C, median ~600, 95th percentile ~900. */
+  --f1-brake-cold: 200;
+  --f1-brake-working: 800;
+  --f1-brake-hot: 950;
+
+  /* Delta, in seconds. Inside this band the delta reads neutral instead of flickering green/yellow. */
+  --f1-delta-neutral: 0.05;
+
+  /* Brake pedal fraction above which the car counts as braking, for the shaded bands on a trace. */
+  --f1-brake-on: 0.15;
+
+  /* ---- Type ----------------------------------------------------------------------------------
+     Two faces with one job each: SAIRA carries words, IOSEVKA carries figures. They must never appear
+     at the same size directly next to each other -- a 44px lap time beside a 44px circuit name is what
+     made an earlier pass look like one badly-rendered font. Size or weight always separates them.
+     The pairing works because Saira is squarish and wide while Iosevka is narrow; an earlier attempt
+     paired Iosevka with Barlow Semi Condensed, and two narrow faces read as one inconsistent face.
+     Both are self-hosted: the app runs on localhost and must not depend on the network. */
+  --f1-font-num: "Iosevka Web", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --f1-font-ui: "Saira", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  /* Type scale. 16px base: an earlier pass ran 15px with 10px labels and was rejected as too small.
+     11px is reserved for uppercase micro-labels and axis numerals, each paired with a large value. */
+  --f1-text-xs: 11px; /* uppercase micro-labels, axis ticks */
+  --f1-text-sm: 13px; /* units, table meta */
+  --f1-text-base: 16px; /* body, table values */
+  --f1-text-md: 20px;
+  --f1-text-lg: 26px; /* panel values */
+  --f1-text-xl: 34px; /* lap time, delta */
+  --f1-text-2xl: 48px; /* circuit name, hero figure */
+  --f1-text-3xl: 64px; /* speed, gear on the live view */
+
+  --f1-leading-tight: 1.1;
+  --f1-leading-body: 1.55;
+  --f1-weight-body: 400;
+  --f1-weight-value: 600;
+  --f1-weight-label: 600;
+  --f1-weight-display: 800; /* Saira at hero sizes, closest to F1's own headings */
+  --f1-tracking-label: 0.09em;
+  --f1-tracking-display: -0.01em;
+
+  /* Figures must not dance. Every live number, table column and axis uses tabular lining figures. */
+  --f1-num-variant: tabular-nums lining-nums;
+
+  /* ---- Density -------------------------------------------------------------------------------
+     4px base. Fixed heights on anything live, so a value changing width never reflows its neighbour. */
+  --f1-space-1: 4px;
+  --f1-space-2: 8px;
+  --f1-space-3: 12px;
+  --f1-space-4: 18px;
+  --f1-space-5: 28px;
+  --f1-space-6: 44px;
+
+  --f1-row-h: 34px; /* table row */
+  --f1-control-h: 34px; /* button, input, select; also the touch floor we accept on desktop */
+  --f1-statusbar-h: 32px;
+  --f1-header-h: 46px; /* a card's header strip */
+  --f1-rail-w: 184px; /* the nav rail */
+  --f1-panel-pad: var(--f1-space-4);
+  --f1-gap: var(--f1-space-3); /* cards sit in a grid with a real gutter, not a 1px seam */
+
+  /* ---- Radii: small and engineered. Pills are for status only. ------------------------------ */
+  --f1-radius-sm: 4px;
+  --f1-radius-md: 8px;
+  --f1-radius-pill: 999px;
+
+  /* ---- Motion --------------------------------------------------------------------------------
+     Live numbers get NO transition: at 30 Hz a 150ms fade is mush and costs frames. These are for
+     hover, panel state and route changes only, and every one of them is disabled under
+     prefers-reduced-motion. */
+  --f1-duration-fast: 90ms;
+  --f1-duration-base: 150ms;
+  --f1-ease: cubic-bezier(0.2, 0.6, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --f1-duration-fast: 0ms;
+    --f1-duration-base: 0ms;
+  }
+}
