@@ -23,3 +23,15 @@ updates:
       prefix: build
       include: scope
     labels: [backend, dependencies]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: monthly
+    groups:
+      frontend:
+        patterns: ["*"]
+    commit-message:
+      prefix: build
+      include: scope
+    labels: [frontend, dependencies]

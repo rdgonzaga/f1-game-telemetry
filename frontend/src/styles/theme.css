@@ -1,0 +1,157 @@
+/* The bridge between the design tokens and the two systems that consume them.
+ *
+ * `tokens.css` holds every value and is the only place one may be written. Nothing here invents a colour, a
+ * size or a radius: it maps what is already there onto Tailwind's `@theme` namespaces and onto shadcn/ui's
+ * contract variables, so a shadcn component inherits the look without being edited.
+ *
+ * If a component seems to need a value that is not reachable from here, the token file is missing something.
+ * Add it there rather than hard-coding it in the component.
+ */
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./tokens.css";
+@import "./fonts.css";
+
+/* ---- shadcn/ui's contract --------------------------------------------------------------------------------
+ * shadcn components only ever read these names. Every one is an alias.
+ *
+ * A note on `--accent`: shadcn means "the hover background", not the brand colour. It is NOT `--f1-accent`.
+ * `--primary` is white rather than F1 red for the same reason: dark ink on `#e10600` measures 3.90:1 and
+ * fails AA for a button label, and docs/design.md keeps the red scarce so it still means something.
+ */
+:root {
+  --background: var(--f1-surface-0);
+  --foreground: var(--f1-text-1);
+  --card: var(--f1-surface-1);
+  --card-foreground: var(--f1-text-1);
+  --popover: var(--f1-surface-overlay);
+  --popover-foreground: var(--f1-text-1);
+  --primary: var(--f1-text-1);
+  --primary-foreground: var(--f1-text-on-fill);
+  --secondary: var(--f1-surface-2);
+  --secondary-foreground: var(--f1-text-2);
+  --muted: var(--f1-surface-sunken);
+  --muted-foreground: var(--f1-text-3);
+  --accent: var(--f1-surface-2);
+  --accent-foreground: var(--f1-text-1);
+  --destructive: var(--f1-critical);
+  --destructive-foreground: var(--f1-text-on-fill);
+  --border: var(--f1-border);
+  --input: var(--f1-border-control);
+  --ring: var(--f1-focus);
+  --radius: var(--f1-radius-md);
+}
+
+/* ---- Tailwind's theme ------------------------------------------------------------------------------------
+ * `inline` so a utility resolves to the `var(--f1-*)` reference rather than freezing today's value.
+ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Surfaces and text by their own names, for the panels that are not shadcn components. */
+  --color-surface-0: var(--f1-surface-0);
+  --color-surface-1: var(--f1-surface-1);
+  --color-surface-2: var(--f1-surface-2);
+  --color-surface-sunken: var(--f1-surface-sunken);
+  --color-surface-chart: var(--f1-surface-chart);
+  --color-border-soft: var(--f1-border-soft);
+  --color-border-hover: var(--f1-border-hover);
+  --color-border-control: var(--f1-border-control);
+  --color-text-1: var(--f1-text-1);
+  --color-text-2: var(--f1-text-2);
+  --color-text-3: var(--f1-text-3);
+  --color-text-disabled: var(--f1-text-disabled);
+  --color-text-on-fill: var(--f1-text-on-fill);
+
+  /* State. A widget reads these by meaning, never by picking a hex. */
+  --color-brand: var(--f1-accent);
+  --color-gain: var(--f1-gain);
+  --color-loss: var(--f1-loss);
+  --color-neutral: var(--f1-neutral);
+  --color-ok: var(--f1-ok);
+  --color-warn: var(--f1-warn);
+  --color-critical: var(--f1-critical);
+  --color-idle: var(--f1-idle);
+  --color-timing-best: var(--f1-timing-best);
+  --color-timing-pb: var(--f1-timing-pb);
+  --color-timing-slow: var(--f1-timing-slow);
+  --color-temp-cold: var(--f1-temp-cold);
+  --color-temp-warming: var(--f1-temp-warming);
+  --color-temp-optimal: var(--f1-temp-optimal);
+  --color-temp-hot: var(--f1-temp-hot);
+  --color-temp-critical: var(--f1-temp-critical);
+  --color-ers: var(--f1-ers);
+  --color-drs: var(--f1-drs);
+  --color-overtake: var(--f1-overtake);
+  --color-fuel: var(--f1-fuel);
+  --color-lap-a: var(--f1-lap-a);
+  --color-lap-b: var(--f1-lap-b);
+
+  --font-sans: var(--f1-font-ui);
+  --font-mono: var(--f1-font-num);
+
+  --text-xs: var(--f1-text-xs);
+  --text-sm: var(--f1-text-sm);
+  --text-base: var(--f1-text-base);
+  --text-md: var(--f1-text-md);
+  --text-lg: var(--f1-text-lg);
+  --text-xl: var(--f1-text-xl);
+  --text-2xl: var(--f1-text-2xl);
+  --text-3xl: var(--f1-text-3xl);
+
+  --radius-sm: var(--f1-radius-sm);
+  --radius-md: var(--f1-radius-md);
+  --radius-lg: var(--f1-radius-md);
+  --radius-full: var(--f1-radius-pill);
+
+  --shadow-overlay: var(--f1-shadow-overlay);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--f1-surface-0);
+    color: var(--f1-text-2);
+    font-family: var(--f1-font-ui);
+    font-size: var(--f1-text-base);
+    line-height: var(--f1-leading-body);
+    /* A dashboard is a fixed frame with scrolling panels inside it, never a scrolling page. */
+    overflow: hidden;
+  }
+
+  /* Figures must not dance: every number the eye tracks is tabular. */
+  .tnum,
+  th,
+  td,
+  input,
+  output {
+    font-variant-numeric: var(--f1-num-variant);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--f1-focus);
+    outline-offset: 2px;
+  }
+}

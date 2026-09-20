@@ -1,0 +1,52 @@
+/* Self-hosted through Fontsource, which ships the font files as an npm dependency.
+ *
+ * The app runs on localhost and must work with no internet, so a Google Fonts link is not an option: offline it
+ * falls back to Consolas and the dashboard stops looking like itself.
+ *
+ * These @font-face rules are written out rather than importing Fontsource's own stylesheets, because those also
+ * declare a `.woff` source for browsers that predate 2016. Iosevka's latin subset is ~1 MB per weight, so those
+ * fallbacks alone were 3.8 MB of the build. The app opens in a current browser, and woff2 is all it needs.
+ *
+ * Only the weights docs/design.md uses are here. Saira: 400 body, 600 values and labels, 800 hero headings.
+ * Iosevka: 400 figures, 600 the live values that lead a panel.
+ */
+
+@font-face {
+  font-family: "Saira";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("@fontsource/saira/files/saira-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Saira";
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+  src: url("@fontsource/saira/files/saira-latin-600-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Saira";
+  font-style: normal;
+  font-weight: 800;
+  font-display: block;
+  src: url("@fontsource/saira/files/saira-latin-800-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Iosevka";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("@fontsource/iosevka/files/iosevka-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Iosevka";
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+  src: url("@fontsource/iosevka/files/iosevka-latin-600-normal.woff2") format("woff2");
+}
