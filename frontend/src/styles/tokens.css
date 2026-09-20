@@ -147,11 +147,29 @@
 
   /* Tyre temperature, in Celsius. Across three races the CARCASS (inner) stays inside 69-97 C while
      the SURFACE swings 43-152 C within a single lap. Colour therefore tracks the carcass; the surface
-     is shown as a second, uncoloured number. Colouring the surface makes the widget strobe. */
+     is shown as a second, uncoloured number. Colouring the surface makes the widget strobe.
+
+     There are two band sets, chosen by the fitted COMPOUND and never by the weather: a driver on
+     slicks in the rain is still on slicks. A wet-weather tyre works 25-30 C cooler than a slick, so
+     one ramp cannot serve both -- on the slick bands an entire wet race reads cold and the grid stops
+     carrying information exactly when it matters most. */
   --f1-tyre-inner-cold: 78; /* below this: cold */
   --f1-tyre-inner-warming: 84; /* below: warming */
   --f1-tyre-inner-optimal: 96; /* below: optimal */
   --f1-tyre-inner-hot: 100; /* below: hot, at or above: critical */
+
+  /* Intermediates and full wets. Measured per corner while racing on intermediates through a storm at
+     Spa: 46-72 C, median 62, 90th percentile 70, and a ceiling of 72 it never passed.
+     FULL WETS ARE UNMEASURED -- compound 8 has never appeared in a recording -- so they borrow these
+     numbers rather than having any invented for them. Re-measure when a full-wet race exists. */
+  --f1-tyre-inner-wet-cold: 52; /* below this: cold */
+  --f1-tyre-inner-wet-warming: 58; /* below: warming */
+  --f1-tyre-inner-wet-optimal: 70; /* below: optimal */
+  --f1-tyre-inner-wet-hot: 73; /* below: hot, at or above: critical */
+
+  /* The visual compound ids that take the wet band set; everything else takes the slick one. */
+  --f1-tyre-compound-inter: 7;
+  --f1-tyre-compound-wet: 8;
 
   /* Brake temperature, same recordings: range 21-1011 C, median ~600, 95th percentile ~900. */
   --f1-brake-cold: 200;

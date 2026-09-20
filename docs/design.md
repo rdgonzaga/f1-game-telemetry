@@ -114,6 +114,14 @@ the recordings, not from folklore.
 - **Tyre temperature tracks the carcass, not the surface.** Across three races the carcass stays
   inside 69-97 C while the surface swings 43-152 C *within a single lap*. Colouring the surface makes
   the widget strobe. Bands: 78 / 84 / 96 / 100 C. The surface is shown as a second, uncoloured number.
+- **There are two band sets, and the fitted compound picks between them.** Not the weather: a driver
+  who stayed out on slicks in the rain is still on slicks, and that is the moment the grid most needs
+  to be right. Intermediates measured per corner while racing through a storm at Spa run **46-72 C**,
+  median 62, 90th percentile 70, against 69-97 for slicks. On the slick bands that whole race reads
+  cold, so the widget would show four blue corners for 45 minutes and tell you nothing. Wet bands:
+  52 / 58 / 70 / 73 C.
+  **Full wets are unmeasured** - compound 8 has never appeared in a recording - so they borrow the
+  intermediate numbers, and that is recorded here rather than dressed up as a measurement.
 - **Brakes:** 21-1011 C observed, median ~600, p95 ~900. Bands 200 / 800 / 950.
 - **Delta noise band:** 0.05 s. Inside it the delta reads neutral rather than flickering.
 - **Braking:** pedal above 0.15.
@@ -153,6 +161,16 @@ and desaturated, under a yellow "no packets for Ns" badge.
 
 Zeroing them would be a lie, and hiding them throws away the one thing you want after the game drops
 out mid-lap: what it was doing when it stopped.
+
+### Numbers the game has not filled in yet
+
+The first `Session` packet of a session reports **track 0 C and air 0 C**, and only the next one
+carries real values. Rendering that honestly means not rendering it: a track temperature of 0 C is a
+plausible-looking lie, and it is the first thing on screen.
+
+Any field the game has not populated shows an em dash in the value's place, keeping its box and its
+label, rather than a zero. The same rule covers a packet slot that has not arrived: fields are absent,
+not zero, and the two must never look alike.
 
 ### Series and regulations
 
