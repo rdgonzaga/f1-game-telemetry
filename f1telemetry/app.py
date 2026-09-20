@@ -1,7 +1,7 @@
 """The app server: FastAPI on the same asyncio loop as the UDP listener, session tracker, recorder and live feed.
 
-Endpoints: `/ws/live` (see `live_feed`), `/api/sessions` to list, load and delete saved sessions and laps, and
-`/api/setup` for the connection screen.
+Endpoints: `/ws/live` (see `live_feed`), `/api/sessions` to list, load and delete saved sessions and laps,
+`/api/compare` to put two laps side by side (see `compare`), and `/api/setup` for the connection screen.
 
 `create_app` builds the app and `make_server` wraps it in a uvicorn server. The CLI runs that server on the main
 thread; `ServerThread` runs it on a background thread and stops it from code, which the desktop window app needs.
@@ -24,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from pydantic import BaseModel
 
+from f1telemetry.compare import compare_laps
 from f1telemetry.listener import TelemetryProtocol, open_listener
 from f1telemetry.live import LiveState
 from f1telemetry.live_feed import FeedClient, LiveFeed
@@ -141,6 +142,7 @@ def create_app(telemetry: Telemetry, web_dir: Path = WEB_DIR) -> FastAPI:
         )
 
     _add_sessions(app, telemetry)
+    _add_compare(app, telemetry.store)
     _add_live(app, telemetry.feed)
     _add_frontend(app, web_dir)
     return app
@@ -192,6 +194,40 @@ def _add_sessions(app: FastAPI, telemetry: Telemetry) -> None:
             await asyncio.wrap_future(recorder.delete(session_id))
         except KeyError:
             raise HTTPException(status_code=404, detail="no such session") from None
+
+
+def _lap_session(session: Json) -> Json:
+    """What a compared lap says about the session it came from; the track is reported once, for both."""
+    return {
+        "id": session.get("id"),
+        "started_at": session.get("started_at"),
+        "session_type": session.get("session_type"),
+    }
+
+
+def _compare_documents(store: SessionStore, a: tuple[str, int], b: tuple[str, int]) -> Json:
+    """Load both laps and compare them. Blocking, so it runs on a thread; raises KeyError and ValueError."""
+    sessions = [store.load_session(session_id) for session_id, _ in (a, b)]
+    laps = [store.load_lap(session_id, number) for session_id, number in (a, b)]
+    tracks = [session.get("track") for session in sessions]
+    if tracks[0] != tracks[1]:
+        raise ValueError("the laps are from different tracks")
+    result = compare_laps(laps[0], laps[1])
+    for block, session in zip(result["laps"], sessions, strict=True):
+        block["session"] = _lap_session(session)
+    return {"track": tracks[0], **result}
+
+
+def _add_compare(app: FastAPI, store: SessionStore) -> None:
+    @app.get("/api/compare")
+    async def compare(session_a: str, lap_a: int, session_b: str, lap_b: int) -> Json:
+        """Two laps on one 5 m distance grid, with the delta trace and 25 minisector gains."""
+        try:
+            return await asyncio.to_thread(_compare_documents, store, (session_a, lap_a), (session_b, lap_b))
+        except KeyError:
+            raise HTTPException(status_code=404, detail="no such session or lap") from None
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from None
 
 
 def _add_live(app: FastAPI, feed: LiveFeed) -> None:

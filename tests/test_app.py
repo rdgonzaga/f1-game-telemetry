@@ -258,3 +258,117 @@ def test_server_thread_reports_a_failed_start(tmp_path: Path) -> None:
         server = ServerThread(make_server(create_app(Telemetry(settings, tmp_path)), settings))
         with pytest.raises(RuntimeError, match="failed to start"):
             server.start()
+
+
+def save_comparable(
+    data_dir: Path,
+    session_id: str,
+    *,
+    number: int = 1,
+    speed_ms: float = 50.0,
+    start: float = 0.0,
+    end: float = 1000.0,
+    track: int = 7,
+) -> None:
+    """A saved session holding one lap driven at a constant speed, so its compared delta is known exactly."""
+    folder = SessionStore(data_dir).root / session_id
+    distance = [start + (end - start) * i / 100 for i in range(101)]
+    write_json_atomic(
+        folder / "session.json",
+        {
+            "id": session_id,
+            "started_at": "2026-09-18T23:15:02",
+            "ended_at": "2026-09-18T23:30:00",
+            "track": {"id": track, "name": "Monza", "length": 5793},
+            "session_type": {"id": 10, "name": "Race"},
+            "laps": [{"number": number}],
+        },
+    )
+    write_json_atomic(
+        folder / "laps" / f"lap_{number:02d}.json",
+        {
+            "number": number,
+            "lap_time_ms": round(end / speed_ms * 1000),
+            "invalid": False,
+            "partial": False,
+            "samples": len(distance),
+            "columns": {
+                "lap_distance": distance,
+                "lap_time_ms": [round(d / speed_ms * 1000) for d in distance],
+                "speed": [round(speed_ms * 3.6)] * len(distance),
+                "throttle": [1.0] * len(distance),
+                "brake": [0.0] * len(distance),
+                "steer": [0.0] * len(distance),
+            },
+        },
+    )
+
+
+COMPARE = "/api/compare?session_a=20260918-231502_monza_race&lap_a=1&session_b=20260919-101500_monza_race&lap_b=2"
+
+
+def test_two_laps_from_different_sessions_are_compared_on_one_grid(tmp_path: Path) -> None:
+    save_comparable(tmp_path, "20260918-231502_monza_race", number=1, speed_ms=50.0)
+    save_comparable(tmp_path, "20260919-101500_monza_race", number=2, speed_ms=40.0)
+    test_client, _ = client(tmp_path)
+    with test_client:
+        result = test_client.get(COMPARE).json()
+
+    assert result["track"] == {"id": 7, "name": "Monza", "length": 5793}
+    assert (result["step"], result["distance"][0], result["distance"][-1]) == (5.0, 0.0, 1000.0)
+    first, second = result["laps"]
+    assert (first["session"]["id"], first["number"]) == ("20260918-231502_monza_race", 1)
+    assert (second["session"]["id"], second["number"]) == ("20260919-101500_monza_race", 2)
+    assert len(first["columns"]["speed"]) == len(result["delta"]) == len(result["distance"])
+    # 1000 m at 40 m/s instead of 50 m/s: 5 s lost, spread evenly over 25 minisectors.
+    assert result["delta"][-1] == pytest.approx(5.0, abs=0.01)
+    assert len(result["minisectors"]) == 25
+    assert result["minisectors"][0]["delta"] == pytest.approx(0.2, abs=0.01)
+
+
+def test_laps_from_two_tracks_are_not_compared(tmp_path: Path) -> None:
+    save_comparable(tmp_path, "20260918-231502_monza_race", number=1)
+    save_comparable(tmp_path, "20260919-101500_monza_race", number=2, track=3)
+    test_client, _ = client(tmp_path)
+    with test_client:
+        response = test_client.get(COMPARE)
+
+    assert response.status_code == 400
+    assert "track" in response.json()["detail"]
+
+
+def test_laps_that_never_cover_the_same_ground_are_not_compared(tmp_path: Path) -> None:
+    save_comparable(tmp_path, "20260918-231502_monza_race", number=1, start=0.0, end=400.0)
+    save_comparable(tmp_path, "20260919-101500_monza_race", number=2, start=600.0, end=1000.0)
+    test_client, _ = client(tmp_path)
+    with test_client:
+        response = test_client.get(COMPARE)
+
+    assert response.status_code == 400
+    assert "no distance in common" in response.json()["detail"]
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "session_a=20260101-000000_nowhere_race&lap_a=1&session_b=20260918-231502_monza_race&lap_b=1",
+        "session_a=20260918-231502_monza_race&lap_a=9&session_b=20260918-231502_monza_race&lap_b=1",
+        "session_a=..%2F..%2Fsecret&lap_a=1&session_b=20260918-231502_monza_race&lap_b=1",
+    ],
+)
+def test_comparing_something_that_is_not_there_is_404(tmp_path: Path, query: str) -> None:
+    save_comparable(tmp_path, "20260918-231502_monza_race", number=1)
+    test_client, _ = client(tmp_path)
+    with test_client:
+        assert test_client.get(f"/api/compare?{query}").status_code == 404
+
+
+def test_a_lap_compared_with_itself_is_flat(tmp_path: Path) -> None:
+    save_comparable(tmp_path, "20260918-231502_monza_race", number=1)
+    test_client, _ = client(tmp_path)
+    with test_client:
+        same = "session_a=20260918-231502_monza_race&lap_a=1&session_b=20260918-231502_monza_race&lap_b=1"
+        result = test_client.get(f"/api/compare?{same}").json()
+
+    assert set(result["delta"]) == {0.0}
+    assert {m["delta"] for m in result["minisectors"]} == {0.0}

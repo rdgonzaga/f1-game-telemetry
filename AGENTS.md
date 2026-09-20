@@ -40,7 +40,7 @@ uv run python tools/bench_parse.py                            # parse time per p
 
 ## Layout
 
-- `f1telemetry/` backend package (`cli.py` = the `f1telemetry` command, `app.py` = FastAPI server, `settings.py`, `rawfile.py` = `.f1raw` recording format, `recorder.py` + `replayer.py`, `listener.py` + `live.py` = UDP intake and live state, `live_feed.py` = `/ws/live` snapshots and events, `tracker.py` = session and lap tracking, `store.py` = saved sessions)
+- `f1telemetry/` backend package (`cli.py` = the `f1telemetry` command, `app.py` = FastAPI server, `settings.py`, `rawfile.py` = `.f1raw` recording format, `recorder.py` + `replayer.py`, `listener.py` + `live.py` = UDP intake and live state, `live_feed.py` = `/ws/live` snapshots and events, `tracker.py` = session and lap tracking, `store.py` = saved sessions, `compare.py` = distance resampling, lap delta and minisectors)
 - `tools/` developer scripts (inspector, trimmer and parse benchmark)
 - `docs/udp-spec.md` packet layouts, format differences and real-game behaviour the backend relies on
 - `tests/` pytest suite; small committed recordings go in `tests/fixtures/` (see its README)

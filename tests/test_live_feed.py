@@ -10,13 +10,25 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import pytest
+
+from f1telemetry.lap_data import LapData
 from f1telemetry.live import LiveState
-from f1telemetry.live_feed import FeedClient, LiveFeed, snapshot
+from f1telemetry.live_feed import BestLapDelta, FeedClient, LiveFeed, snapshot
 from f1telemetry.packets import Packet
 from f1telemetry.parsers import make_dispatcher
 from f1telemetry.rawfile import read_records
+from f1telemetry.session import Session
 from f1telemetry.store import SessionRecorder, SessionStore
-from f1telemetry.tracker import SessionTracker
+from f1telemetry.tracker import (
+    Lap,
+    LapCompleted,
+    LapReopened,
+    SessionClosed,
+    SessionOpened,
+    SessionTracker,
+    TrackedSession,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 NOW = 5_000_000_000
@@ -88,6 +100,7 @@ def test_snapshot_before_any_packet_has_every_slot_empty() -> None:
         "status": None,
         "damage": None,
         "telemetry2": None,
+        "delta": None,
     }
 
 
@@ -188,3 +201,106 @@ def test_leaving_stops_the_feed_for_that_client(tmp_path: Path) -> None:
     assert drain(leaving) == []
     assert [m["type"] for m in drain(staying)] == ["session_started", "snapshot"]
     assert live_feed.clients == {staying}
+
+
+SESSION_INFO = next(p.data for p in fixture_packets("race-2026-monza-finish") if isinstance(p.data, Session))
+LAP_DATA = next(p.data for p in fixture_packets("race-2026-monza-finish") if isinstance(p.data, LapData))
+
+
+def driving(distance: float, lap_time_ms: int) -> LapData:
+    """The player car at a point on the lap, with everything else as the game last sent it."""
+    return LAP_DATA._replace(lap_distance=distance, current_lap_time_ms=lap_time_ms)
+
+
+def steady_lap(number: int, speed_ms: float, *, invalid: bool = False, partial: bool = False) -> Lap:
+    """A lap driven at a constant speed over 1000 m, so its time at any distance is known exactly."""
+    lap = Lap(number, 0.0, lap_time_ms=round(1000 / speed_ms * 1000), invalid=invalid, partial=partial)
+    for index in range(101):
+        distance = index * 10.0
+        lap.samples.session_time.append(distance / speed_ms)
+        lap.samples.lap_distance.append(distance)
+        lap.samples.lap_time_ms.append(round(distance / speed_ms * 1000))
+    return lap
+
+
+def session_with(*laps: Lap) -> TrackedSession:
+    return TrackedSession(0xABC, 2026, 21, SESSION_INFO, list(laps))
+
+
+def test_there_is_no_delta_until_the_session_has_a_complete_valid_lap() -> None:
+    delta = BestLapDelta()
+    assert delta.value(driving(500.0, 10_000)) is None
+
+    fast = steady_lap(1, 50.0, invalid=True)
+    delta.on_event(LapCompleted(session_with(fast), fast))
+    assert delta.value(driving(500.0, 10_000)) is None
+
+    partial = steady_lap(2, 50.0, partial=True)
+    delta.on_event(LapCompleted(session_with(partial), partial))
+    assert delta.value(driving(500.0, 10_000)) is None
+
+
+def test_the_delta_is_the_gap_to_the_session_best_at_the_car_s_distance() -> None:
+    delta = BestLapDelta()
+    best = steady_lap(1, 50.0)  # 10 s at the 500 m mark
+    delta.on_event(LapCompleted(session_with(best), best))
+
+    assert delta.value(driving(500.0, 10_000)) == {"best_lap": 1, "seconds": 0.0}
+    assert delta.value(driving(500.0, 10_400)) == {"best_lap": 1, "seconds": 0.4}
+    assert delta.value(driving(250.0, 4_750)) == {"best_lap": 1, "seconds": -0.25}
+
+
+def test_a_quicker_lap_becomes_the_reference() -> None:
+    delta = BestLapDelta()
+    slow, quick = steady_lap(1, 40.0), steady_lap(2, 50.0)
+    delta.on_event(LapCompleted(session_with(slow), slow))
+    assert delta.value(driving(500.0, 12_500)) == {"best_lap": 1, "seconds": 0.0}
+
+    delta.on_event(LapCompleted(session_with(slow, quick), quick))
+    assert delta.value(driving(500.0, 12_500)) == {"best_lap": 2, "seconds": 2.5}
+
+
+def test_reopening_the_best_lap_takes_it_back_as_the_reference() -> None:
+    delta = BestLapDelta()
+    best = steady_lap(1, 50.0)
+    delta.on_event(LapCompleted(session_with(best), best))
+
+    # A flashback past the line: the tracker pops the lap and reports it as open again.
+    delta.on_event(LapReopened(session_with(), best))
+    assert delta.value(driving(500.0, 10_400)) is None
+
+
+def test_the_delta_stops_at_a_session_boundary() -> None:
+    delta = BestLapDelta()
+    best = steady_lap(1, 50.0)
+    delta.on_event(LapCompleted(session_with(best), best))
+
+    delta.on_event(SessionClosed(session_with(best), "ended"))
+    assert delta.value(driving(500.0, 10_400)) is None
+
+    delta.on_event(LapCompleted(session_with(best), best))
+    delta.on_event(SessionOpened(session_with()))
+    assert delta.value(driving(500.0, 10_400)) is None
+
+
+def test_there_is_no_delta_where_the_reference_lap_does_not_reach() -> None:
+    delta = BestLapDelta()
+    best = steady_lap(1, 50.0)
+    delta.on_event(LapCompleted(session_with(best), best))
+
+    assert delta.value(driving(1500.0, 30_000)) is None  # a longer track than the reference covered
+    assert delta.value(driving(-20.0, 0)) is None  # before the line
+
+
+def test_the_snapshot_carries_the_delta(tmp_path: Path) -> None:
+    live_feed, _, _ = feed(tmp_path)
+    best = steady_lap(1, 50.0)
+    live_feed.on_event(LapCompleted(session_with(best), best))
+    live_feed.state.lap = driving(500.0, 10_400)
+
+    message = snapshot(live_feed.state, connected=True, delta=live_feed.delta.value(live_feed.state.lap))
+    assert message["delta"] == {"best_lap": 1, "seconds": 0.4}
+
+    [update] = [m for m in drain(live_feed.join()) if m["type"] == "snapshot"]
+    assert update["delta"] == {"best_lap": 1, "seconds": 0.4}
+    assert update["lap"]["lap_distance"] == pytest.approx(500.0)
