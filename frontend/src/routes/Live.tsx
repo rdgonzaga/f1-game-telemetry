@@ -1,15 +1,18 @@
 import { ComingIn } from "@/components/ComingIn";
+import { CarPanel } from "@/components/live/CarPanel";
 
 /**
  * The live view. Not lazy: it is the route the app opens on, so its code must already be there.
  *
- * The panels land one issue at a time. Each will write its values through refs and requestAnimationFrame
- * rather than re-rendering per telemetry frame (AGENTS.md), so they are not simple children of this file.
+ * Each panel writes its values through refs and requestAnimationFrame rather than re-rendering per
+ * telemetry frame (AGENTS.md), so they are not simple children of this file.
+ *
+ * Two columns of equal rows, so four panels sit 2 by 2 and none is left alone on a row.
  */
 export default function Live() {
   return (
-    <div className="grid h-full grid-cols-1 gap-[var(--f1-gap)] xl:grid-cols-3">
-      <ComingIn title="Speed and inputs" issue={23} what="Speed, gear, RPM and the throttle, brake and steering bars." />
+    <div className="grid h-full grid-cols-1 gap-[var(--f1-gap)] xl:grid-cols-2 xl:auto-rows-fr">
+      <CarPanel />
       <ComingIn title="Tyres" issue={24} what="Carcass temperature, wear and pressure for all four corners." />
       <ComingIn title="Timing" issue={25} what="Lap time, the delta to the session best, fuel and session info." />
       <ComingIn title="ERS and aero" issue={26} what="ERS store and deployment, overtake, and 2026 active aero." />

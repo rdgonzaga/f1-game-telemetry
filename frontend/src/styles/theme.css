@@ -117,6 +117,7 @@
   --text-xl: var(--f1-text-xl);
   --text-2xl: var(--f1-text-2xl);
   --text-3xl: var(--f1-text-3xl);
+  --text-hero: var(--f1-text-hero);
 
   --radius-sm: var(--f1-radius-sm);
   --radius-md: var(--f1-radius-md);
