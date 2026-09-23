@@ -107,6 +107,9 @@ committed fixtures in `tests/fixtures/` pin the ones the parsers can show.
   Silence doesn't mean the session is over, so the tracker has no idle timeout.
 - Time Trial freezes tyre temperatures, engine temperature, fuel, ERS store and tyre wear, so those fields need a
   race session to verify.
+- **`fuelRemainingLaps` means two things.** In a race it is the MFD's margin over the finish: 20.4 kg on lap 1 of a
+  13-lap race read +1.52, and about +0.3 on every lap after. In practice and qualifying it is laps of fuel on board:
+  20 kg read 13.27. Anything showing it has to label it by session type.
 - **At the chequered flag `currentLapNum` does not increment**; only `lastLapTimeInMS` changes. Lap segmentation has
   to close a lap on that change too. `resultStatus` becomes 3 (finished) at the same moment. The change lands only
   about 0.1 s before `SEND`, so at a UDP send rate of 20 Hz or lower LapData can miss it. The game's last

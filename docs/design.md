@@ -127,6 +127,8 @@ the recordings, not from folklore.
   committed drive on full TC may push them up.
 - **Brakes:** 21-1011 C observed, median ~600, p95 ~900. Bands 200 / 800 / 950.
 - **Delta noise band:** 0.05 s. Inside it the delta reads neutral rather than flickering.
+- **Fuel margin:** a race margin below 0 laps (the car cannot reach the flag) reads as a loss, yellow. It is
+  caution, not trouble: lift-and-coast still fixes it.
 - **Braking:** pedal above 0.15.
 
 ## What we do not draw
