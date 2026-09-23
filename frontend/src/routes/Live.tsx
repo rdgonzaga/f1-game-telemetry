@@ -1,5 +1,6 @@
 import { ComingIn } from "@/components/ComingIn";
 import { CarPanel } from "@/components/live/CarPanel";
+import { TyrePanel } from "@/components/live/TyrePanel";
 
 /**
  * The live view. Not lazy: it is the route the app opens on, so its code must already be there.
@@ -13,7 +14,7 @@ export default function Live() {
   return (
     <div className="grid h-full grid-cols-1 gap-[var(--f1-gap)] xl:grid-cols-2 xl:auto-rows-fr">
       <CarPanel />
-      <ComingIn title="Tyres" issue={24} what="Carcass temperature, wear and pressure for all four corners." />
+      <TyrePanel />
       <ComingIn title="Timing" issue={25} what="Lap time, the delta to the session best, fuel and session info." />
       <ComingIn title="ERS and aero" issue={26} what="ERS store and deployment, overtake, and 2026 active aero." />
     </div>
