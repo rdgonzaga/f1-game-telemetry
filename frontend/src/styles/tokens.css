@@ -85,6 +85,9 @@
   --f1-warn: #f5c518;
   --f1-critical: #ff4747; /* the readable red: use this for red TEXT, never --f1-accent */
   --f1-idle: #9295a3; /* connected but no packets: paused, or sitting in a menu */
+  /* Live panels once packets stop: the last values stay, dimmed and desaturated, so they read as
+     "what it was doing" rather than as current. */
+  --f1-stale-filter: saturate(0.2) opacity(0.6);
 
   /* ---- Temperature ramp ----------------------------------------------------------------------
      Cold to critical. Thresholds live further down as numbers so CSS and TypeScript cannot drift. */
@@ -182,6 +185,10 @@
   /* Brake pedal fraction above which the car counts as braking, for the shaded bands on a trace. */
   --f1-brake-on: 0.15;
 
+  /* Fraction of the car's max rpm where the rev arc turns red. Not a game value: the rev lights are
+     the game's own and differ per car, so this only marks the top of the range on the arc. */
+  --f1-rev-redline: 0.88;
+
   /* ---- Type ----------------------------------------------------------------------------------
      Two faces with one job each: SAIRA carries words, IOSEVKA carries figures. They must never appear
      at the same size directly next to each other -- a 44px lap time beside a 44px circuit name is what
@@ -202,7 +209,8 @@
   --f1-text-lg: 26px; /* panel values */
   --f1-text-xl: 34px; /* lap time, delta */
   --f1-text-2xl: 48px; /* circuit name, hero figure */
-  --f1-text-3xl: 64px; /* speed, gear on the live view */
+  --f1-text-3xl: 64px; /* gear on the live view */
+  --f1-text-hero: 112px; /* speed on the live view: the one figure that leads the whole screen */
 
   --f1-leading-tight: 1.1;
   --f1-leading-body: 1.55;
