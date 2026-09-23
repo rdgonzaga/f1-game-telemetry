@@ -118,10 +118,13 @@ the recordings, not from folklore.
   who stayed out on slicks in the rain is still on slicks, and that is the moment the grid most needs
   to be right. Intermediates measured per corner while racing through a storm at Spa run **46-72 C**,
   median 62, 90th percentile 70, against 69-97 for slicks. On the slick bands that whole race reads
-  cold, so the widget would show four blue corners for 45 minutes and tell you nothing. Wet bands:
-  52 / 58 / 70 / 73 C.
-  **Full wets are unmeasured** - compound 8 has never appeared in a recording - so they borrow the
-  intermediate numbers, and that is recorded here rather than dressed up as a measurement.
+  cold, so the widget would show four blue corners for 45 minutes and tell you nothing. Intermediate
+  bands: 52 / 58 / 70 / 73 C.
+- **Full wets get a third set, because they run hotter than intermediates.** An 11-lap stint on
+  compound 8 through a storm at Interlagos ran **61-91 C**, median 72, 90th percentile 86. On the
+  intermediate bands that reads hot for most of the stint. Full-wet bands: 64 / 68 / 82 / 86 C.
+  Both wet sets were measured on medium traction control with a lot of feathered throttle, so a
+  committed drive on full TC may push them up.
 - **Brakes:** 21-1011 C observed, median ~600, p95 ~900. Bands 200 / 800 / 950.
 - **Delta noise band:** 0.05 s. Inside it the delta reads neutral rather than flickering.
 - **Braking:** pedal above 0.15.

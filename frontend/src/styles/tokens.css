@@ -161,16 +161,23 @@
   --f1-tyre-inner-optimal: 96; /* below: optimal */
   --f1-tyre-inner-hot: 100; /* below: hot, at or above: critical */
 
-  /* Intermediates and full wets. Measured per corner while racing on intermediates through a storm at
-     Spa: 46-72 C, median 62, 90th percentile 70, and a ceiling of 72 it never passed.
-     FULL WETS ARE UNMEASURED -- compound 8 has never appeared in a recording -- so they borrow these
-     numbers rather than having any invented for them. Re-measure when a full-wet race exists. */
-  --f1-tyre-inner-wet-cold: 52; /* below this: cold */
-  --f1-tyre-inner-wet-warming: 58; /* below: warming */
-  --f1-tyre-inner-wet-optimal: 70; /* below: optimal */
-  --f1-tyre-inner-wet-hot: 73; /* below: hot, at or above: critical */
+  /* Intermediates. Measured per corner while racing through a storm at Spa: 46-72 C, median 62,
+     90th percentile 70, and a ceiling of 72 it never passed. */
+  --f1-tyre-inner-inter-cold: 52; /* below this: cold */
+  --f1-tyre-inner-inter-warming: 58; /* below: warming */
+  --f1-tyre-inner-inter-optimal: 70; /* below: optimal */
+  --f1-tyre-inner-inter-hot: 73; /* below: hot, at or above: critical */
 
-  /* The visual compound ids that take the wet band set; everything else takes the slick one. */
+  /* Full wets run HOTTER than intermediates, so the two cannot share a set. Measured over an 11-lap
+     stint in a storm at Interlagos: 61-91 C, median 72, 90th percentile 86.
+     Both wet sets come from medium traction control with a lot of feathered throttle; a committed drive
+     on full TC may run hotter and push these up. Re-measure when that recording exists. */
+  --f1-tyre-inner-wet-cold: 64; /* below this: cold */
+  --f1-tyre-inner-wet-warming: 68; /* below: warming */
+  --f1-tyre-inner-wet-optimal: 82; /* below: optimal */
+  --f1-tyre-inner-wet-hot: 86; /* below: hot, at or above: critical */
+
+  /* The visual compound ids that take the inter and full-wet sets; everything else takes the slick one. */
   --f1-tyre-compound-inter: 7;
   --f1-tyre-compound-wet: 8;
 
