@@ -134,6 +134,11 @@ committed fixtures in `tests/fixtures/` pin the ones the parsers can show.
 - **F2 (`formula` 2):** ERS and overtake data are meaningless, `regulations2026Applicable` is false, and the top gear
   is 6 at 8750 RPM. The 2026 Session packet **still lists active aero zones for F2**, so the UI must gate 2026
   widgets on the `regulations2026Applicable` flag, never on zone presence.
+- **ERS store tops out at exactly 4.00 MJ** in both formats, but a 2026 lap deploys up to 8.6 MJ (harvesting while
+  deploying), so deployed energy can't be read as a share of the store. `ersHarvestLimitPerLap` moves within one
+  session (6.0 and 6.9 MJ both seen).
+- **`activeAeroMode` 1 is straight mode** (median 300 km/h against 187 for mode 0). **`overtakeActive` is armed,
+  not firing:** once on it stays true for most of the lap.
 - **Active aero zones can wrap the start/finish line**, so a zone's start fraction may be greater than its end
   (0.954 → 0.152 at Monza).
 - **`maxGears` reads one above the top usable gear** (9 for F1, 7 for F2).
