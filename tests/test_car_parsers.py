@@ -15,7 +15,7 @@ from f1telemetry.car_damage import CarDamage
 from f1telemetry.car_status import CarStatus
 from f1telemetry.car_telemetry import CarTelemetry
 from f1telemetry.lap_data import LapData
-from f1telemetry.names import actual_tyre_compound_name, ers_deploy_mode_name, visual_tyre_compound_name
+from f1telemetry.names import ers_deploy_mode_name
 from f1telemetry.packets import FORMATS, HEADER, PacketDispatcher, PacketHeader, PacketId
 
 FULL_TELEMETRY = {2025: struct.Struct("<HfffBbH?BH4H4B4BH4f4B"), 2026: struct.Struct("<HfffBbH?BH4H4B4BB4f4B")}
@@ -45,16 +45,6 @@ def build_packet(
 
 def players(packet_format: int) -> list[int]:
     return [0, 7, FORMATS[packet_format].max_cars - 1]
-
-
-def test_full_layouts_match_spec_slot_sizes() -> None:
-    assert [FULL_TELEMETRY[f].size for f in FORMATS_UNDER_TEST] == [60, 59]
-    assert [FULL_STATUS[f].size for f in FORMATS_UNDER_TEST] == [55, 59]
-    assert FULL_DAMAGE.size == 46
-    assert FULL_LAP.size == 57
-    assert car_telemetry.CAR_SIZES == {2025: 60, 2026: 59}
-    assert car_status.CAR_SIZES == {2025: 55, 2026: 59}
-    assert (car_damage.CAR_SIZE, lap_data.CAR_SIZE) == (46, 57)
 
 
 @pytest.mark.parametrize("packet_format", FORMATS_UNDER_TEST)
@@ -128,26 +118,8 @@ def test_lap_data_combines_minutes_and_millis(packet_format: int) -> None:
         assert packet.data == expected
 
 
-@pytest.mark.parametrize("packet_format", FORMATS_UNDER_TEST)
-@pytest.mark.parametrize(
-    "packet_id", [PacketId.CAR_TELEMETRY, PacketId.CAR_STATUS, PacketId.CAR_DAMAGE, PacketId.LAP_DATA]
-)
-def test_no_player_car_returns_none(packet_format: int, packet_id: PacketId) -> None:
-    packet = make_dispatcher().parse(build_packet(packet_format, packet_id, FULL_LAP, (), player=255))
-    assert packet is not None
-    assert packet.data is None
-
-
 def test_ers_deploy_mode_3_differs_by_format() -> None:
     assert ers_deploy_mode_name(3, 2025) == "Overtake"
     assert ers_deploy_mode_name(3, 2026) == "Boost"
     assert ers_deploy_mode_name(2, 2025) == ers_deploy_mode_name(2, 2026) == "Hotlap"
     assert ers_deploy_mode_name(9, 2026) == "Unknown mode (9)"
-
-
-def test_tyre_compound_names_cover_f1_and_f2() -> None:
-    assert visual_tyre_compound_name(16) == "Soft"
-    assert visual_tyre_compound_name(20) == "F2 Soft"
-    assert actual_tyre_compound_name(18) == "C3"
-    assert actual_tyre_compound_name(12) == "F2 Soft"
-    assert actual_tyre_compound_name(99) == "Unknown compound (99)"

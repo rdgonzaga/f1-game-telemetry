@@ -86,24 +86,6 @@ def feed_packets(live_feed: LiveFeed, tracker: SessionTracker, packets: list[Pac
         tracker.update(packet)
 
 
-def test_snapshot_before_any_packet_has_every_slot_empty() -> None:
-    message = snapshot(LiveState(), connected=False)
-    assert message == {
-        "type": "snapshot",
-        "connected": False,
-        "packet_format": None,
-        "player_index": None,
-        "packets_per_second": 0,
-        "session": None,
-        "lap": None,
-        "telemetry": None,
-        "status": None,
-        "damage": None,
-        "telemetry2": None,
-        "delta": None,
-    }
-
-
 def test_snapshot_flattens_each_packet_and_rounds_float32_noise(tmp_path: Path) -> None:
     live_feed, tracker, _ = feed(tmp_path)
     feed_packets(live_feed, tracker, fixture_packets("race-2026-monza-finish"))

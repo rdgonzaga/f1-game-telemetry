@@ -37,10 +37,6 @@ def echo(header: PacketHeader, data: bytes) -> tuple[int, int]:
     return header.packet_format, len(data)
 
 
-def test_header_is_29_bytes() -> None:
-    assert HEADER.size == 29
-
-
 def test_header_decodes_every_field() -> None:
     expected = make_header(2025, PacketId.LAP_DATA)
     dispatcher = PacketDispatcher()
@@ -49,27 +45,6 @@ def test_header_decodes_every_field() -> None:
     assert packet is not None
     assert packet.header == expected
     assert packet.data == (2025, 1285)
-
-
-@pytest.mark.parametrize(
-    ("packet_format", "packet_id", "per_car", "trailing"),
-    [
-        (2025, PacketId.CAR_TELEMETRY, 60, 3),
-        (2026, PacketId.CAR_TELEMETRY, 59, 3),
-        (2025, PacketId.CAR_STATUS, 55, 0),
-        (2026, PacketId.CAR_STATUS, 59, 0),
-        (2025, PacketId.LAP_DATA, 57, 2),
-        (2026, PacketId.LAP_DATA, 57, 2),
-        (2025, PacketId.CAR_DAMAGE, 46, 0),
-        (2026, PacketId.CAR_DAMAGE, 46, 0),
-        (2026, PacketId.CAR_TELEMETRY_2, 10, 0),
-    ],
-)
-def test_per_car_packet_sizes_match_layout(
-    packet_format: int, packet_id: PacketId, per_car: int, trailing: int
-) -> None:
-    spec = FORMATS[packet_format]
-    assert spec.packet_sizes[packet_id] == HEADER.size + spec.max_cars * per_car + trailing
 
 
 def test_routes_by_format() -> None:

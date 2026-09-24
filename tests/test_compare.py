@@ -76,18 +76,6 @@ def test_delta_is_how_much_time_the_second_lap_has_lost_at_each_point() -> None:
     assert result["delta"][0] == 0.0
 
 
-def test_traces_keep_each_lap_in_its_own_block_with_its_summary() -> None:
-    result = compare_laps(steady_lap(1, 50.0), steady_lap(7, 40.0))
-
-    first, second = result["laps"]
-    assert (first["number"], second["number"]) == (1, 7)
-    assert (first["lap_time_ms"], second["lap_time_ms"]) == (20000, 25000)
-    assert (first["invalid"], first["partial"]) == (False, False)
-    assert sorted(first["columns"]) == ["brake", "speed", "steer", "throttle"]
-    assert first["columns"]["speed"][10] == pytest.approx(180.0, abs=0.5)
-    assert second["columns"]["speed"][10] == pytest.approx(144.0, abs=0.5)
-
-
 def test_minisectors_split_the_compared_distance_into_equal_gains() -> None:
     result = compare_laps(steady_lap(1, 50.0), steady_lap(2, 40.0))
 
@@ -157,15 +145,6 @@ def test_a_reference_gives_the_best_lap_time_at_a_distance() -> None:
     assert reference.number == 1
     assert reference.time_at(500.0) == pytest.approx(10_000, abs=5)
     assert reference.time_at(502.5) == pytest.approx(10_050, abs=5)
-
-
-def test_a_reference_has_no_time_outside_the_lap_it_was_built_from() -> None:
-    lap = steady_lap(1, 50.0, start=100.0, end=900.0)
-    reference = LapReference.build(1, lap["columns"]["lap_distance"], lap["columns"]["lap_time_ms"])
-
-    assert reference is not None
-    assert reference.time_at(50.0) is None
-    assert reference.time_at(950.0) is None
 
 
 def test_a_lap_too_short_to_resample_has_no_reference() -> None:

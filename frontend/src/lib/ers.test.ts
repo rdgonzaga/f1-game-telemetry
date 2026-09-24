@@ -12,6 +12,8 @@ it("gates each section on the series and the regulations flag, never on the form
   expect(sections(session(0), null)).toEqual({ ers: true, regs2026: false });
   expect(sections(session(2), telemetry2(false))).toEqual({ ers: false, regs2026: false });
   expect(sections(session(2), null)).toEqual({ ers: false, regs2026: false });
+  // Before the first Session packet, nothing is known, so nothing is painted.
+  expect(sections(null, null)).toEqual({ ers: false, regs2026: false });
 });
 
 it("names deploy mode 3 by format", () => {

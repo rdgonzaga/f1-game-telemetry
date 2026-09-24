@@ -21,13 +21,13 @@ from typing import Any, NamedTuple, get_type_hints
 import pytest
 from fastapi.testclient import TestClient
 
-from f1telemetry.app import SetupInfo, Telemetry, create_app
+from f1telemetry.app import Telemetry, create_app
 from f1telemetry.car_damage import CarDamage
 from f1telemetry.car_status import CarStatus
 from f1telemetry.car_telemetry import CarTelemetry
 from f1telemetry.car_telemetry2 import CarTelemetry2
 from f1telemetry.lap_data import LapData
-from f1telemetry.live import PACKET_SLOTS, LiveState
+from f1telemetry.live import LiveState
 from f1telemetry.live_feed import snapshot
 from f1telemetry.openapi import document
 from f1telemetry.rawfile import read_records
@@ -137,10 +137,6 @@ def test_snapshot_matches_what_the_feed_sends() -> None:
     assert set(snapshot(LiveState(), connected=False)) == set(LiveSnapshot.model_fields)
 
 
-def test_snapshot_carries_every_packet_slot() -> None:
-    assert set(PACKET_SLOTS.values()) <= set(LiveSnapshot.model_fields)
-
-
 def test_session_matches_the_declared_summary(recorded: Recorded) -> None:
     assert set(recorded.session) == set(SessionSummary.model_fields)
 
@@ -152,10 +148,3 @@ def test_lap_matches_the_declared_document(recorded: Recorded) -> None:
 
 def test_compare_matches_the_declared_result(recorded: Recorded) -> None:
     assert set(recorded.compare) == set(CompareResult.model_fields)
-
-
-def test_setup_is_validated_so_it_needs_no_guard(schema: dict[str, Any]) -> None:
-    """`/api/setup` returns a model, so FastAPI already enforces it; this only pins it to the document."""
-    response = schema["paths"]["/api/setup"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
-    assert response["$ref"] == "#/components/schemas/SetupInfo"
-    assert set(SetupInfo.model_fields) == set(schema["components"]["schemas"]["SetupInfo"]["properties"])

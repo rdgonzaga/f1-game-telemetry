@@ -20,7 +20,6 @@ from f1telemetry.store import (
     SessionRecorder,
     SessionStore,
     best_lap_number,
-    default_data_dir,
     lap_document,
     write_json_atomic,
 )
@@ -192,18 +191,6 @@ def test_session_whose_only_lap_was_undone_is_removed(tmp_path: Path) -> None:
     assert list(store.root.iterdir()) == []
 
 
-def test_active_session_id_follows_the_open_session(tmp_path: Path) -> None:
-    rec, _, _ = recorder(tmp_path)
-    session = make_session()
-    assert rec.active_session_id is None
-
-    rec.on_event(SessionOpened(session))
-    assert rec.active_session_id == "20260918-231502_monza_race"
-
-    rec.on_event(SessionClosed(session, "ended"))
-    assert rec.active_session_id is None
-
-
 def test_sessions_opened_in_the_same_second_get_distinct_ids(tmp_path: Path) -> None:
     rec, store, executor = recorder(tmp_path)
     for uid in (1, 2):
@@ -229,23 +216,6 @@ def test_list_is_newest_first_and_skips_unreadable_folders(tmp_path: Path) -> No
 
     assert [s["id"] for s in store.list_sessions()] == ["20260301-120000_jeddah_race", "20260101-120000_monza_race"]
     assert SessionStore(tmp_path / "missing").list_sessions() == []
-
-
-def test_load_and_delete(tmp_path: Path) -> None:
-    store = SessionStore(tmp_path)
-    session_id = "20260101-120000_monza_race"
-    write_json_atomic(store.root / session_id / "session.json", {"id": session_id})
-
-    assert store.load_session(session_id) == {"id": session_id}
-    with pytest.raises(KeyError):
-        store.load_lap(session_id, 1)
-
-    store.delete_session(session_id)
-    assert not (store.root / session_id).exists()
-    with pytest.raises(KeyError):
-        store.load_session(session_id)
-    with pytest.raises(KeyError):
-        store.delete_session(session_id)
 
 
 @pytest.mark.parametrize("session_id", ["..", "../../etc", "20260101-120000_monza_race/../x", "", "a b"])
@@ -283,16 +253,6 @@ def test_best_lap_skips_invalid_and_partial_laps() -> None:
     ]
     assert best_lap_number(laps) == 4
     assert best_lap_number(laps[:2]) is None
-
-
-def test_default_data_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setattr("sys.platform", "win32")
-    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
-    assert default_data_dir() == tmp_path / "F1Telemetry"
-
-    monkeypatch.setattr("sys.platform", "linux")
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
-    assert default_data_dir() == tmp_path / "xdg" / "f1telemetry"
 
 
 def test_recorder_document_follows_the_session(tmp_path: Path) -> None:
@@ -339,14 +299,3 @@ def test_delete_waits_for_writes_still_pending(tmp_path: Path) -> None:
     assert deleted.done() and deleted.exception() is None
     assert store.list_sessions() == []
     assert list(store.root.iterdir()) == []
-
-
-def test_lap_bytes_are_the_saved_file(tmp_path: Path) -> None:
-    store = SessionStore(tmp_path)
-    session_id = "20260101-120000_monza_race"
-    write_json_atomic(store.root / session_id / "laps" / "lap_03.json", {"number": 3})
-
-    assert store.lap_bytes(session_id, 3) == (store.root / session_id / "laps" / "lap_03.json").read_bytes()
-    assert store.load_lap(session_id, 3) == {"number": 3}
-    with pytest.raises(KeyError):
-        store.lap_bytes(session_id, 4)

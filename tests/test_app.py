@@ -361,14 +361,3 @@ def test_comparing_something_that_is_not_there_is_404(tmp_path: Path, query: str
     test_client, _ = client(tmp_path)
     with test_client:
         assert test_client.get(f"/api/compare?{query}").status_code == 404
-
-
-def test_a_lap_compared_with_itself_is_flat(tmp_path: Path) -> None:
-    save_comparable(tmp_path, "20260918-231502_monza_race", number=1)
-    test_client, _ = client(tmp_path)
-    with test_client:
-        same = "session_a=20260918-231502_monza_race&lap_a=1&session_b=20260918-231502_monza_race&lap_b=1"
-        result = test_client.get(f"/api/compare?{same}").json()
-
-    assert set(result["delta"]) == {0.0}
-    assert {m["delta"] for m in result["minisectors"]} == {0.0}

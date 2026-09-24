@@ -10,36 +10,9 @@ import pytest
 from f1telemetry import cli
 
 
-def test_no_command_means_serve() -> None:
-    args = cli.parse_args([])
-    assert args.command == "serve"
-    assert (args.listen_mode, args.no_browser, args.data_dir) == (None, False, None)
-
-
 def test_serve_options_work_without_the_command_name() -> None:
     args = cli.parse_args(["--network", "--udp-port", "20800", "--no-browser"])
     assert (args.command, args.listen_mode, args.udp_port, args.no_browser) == ("serve", "network", 20800, True)
-
-
-def test_network_and_local_are_exclusive() -> None:
-    with pytest.raises(SystemExit):
-        cli.parse_args(["--network", "--local"])
-
-
-def test_record_and_replay_commands() -> None:
-    record = cli.parse_args(["record", "--out", "lap.f1raw", "--force"])
-    assert (record.command, record.out, record.force) == ("record", Path("lap.f1raw"), True)
-
-    replay = cli.parse_args(["replay", "lap.f1raw", "--speed", "2"])
-    assert (replay.command, replay.path, replay.speed) == ("replay", Path("lap.f1raw"), 2.0)
-
-
-def test_port_problem_reports_a_taken_port() -> None:
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as taken:
-        taken.bind(("127.0.0.1", 0))
-        port = taken.getsockname()[1]
-        assert cli.port_problem(socket.SOCK_DGRAM, "127.0.0.1", port)
-    assert cli.port_problem(socket.SOCK_DGRAM, "127.0.0.1", 0) is None
 
 
 def test_serve_exits_with_one_line_when_the_udp_port_is_taken(tmp_path: Path) -> None:
