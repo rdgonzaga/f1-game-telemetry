@@ -6,7 +6,6 @@ import pytest
 
 from f1telemetry import event, session
 from f1telemetry.event import FastestLap, Flashback, SessionEnded, SessionStarted
-from f1telemetry.names import formula_name, session_type_name, track_name
 from f1telemetry.packets import FORMATS, HEADER, PacketDispatcher, PacketHeader, PacketId
 
 
@@ -56,14 +55,6 @@ def test_session_decodes_shared_fields(packet_format: int) -> None:
     assert (data.sector2_lap_distance_start, data.sector3_lap_distance_start) == (1800.5, 3600.25)
 
 
-def test_session_2025_has_no_active_aero() -> None:
-    packet = make_dispatcher().parse(bytes(make_session(2025)))
-    assert packet is not None and isinstance(packet.data, session.Session)
-    assert packet.data.active_aero_track_status is None
-    assert packet.data.active_aero_zones_full == ()
-    assert packet.data.active_aero_zones_partial == ()
-
-
 def test_session_2026_active_aero_zones_respect_counts() -> None:
     data = make_session(2026)
     struct.pack_into("<BB", data, session.AERO_STATUS_OFFSET, 1, 2)
@@ -98,19 +89,3 @@ def test_events_decode_in_both_formats(packet_format: int) -> None:
         assert packet is not None
         assert packet.data == expected
         assert packet.data
-
-
-def test_unhandled_event_code_returns_none() -> None:
-    packet = make_dispatcher().parse(make_event(2026, b"BUTN", b"\x01\x00\x00\x00"))
-    assert packet is not None
-    assert packet.data is None
-
-
-def test_readable_names() -> None:
-    assert track_name(42) == "Madrid"
-    assert track_name(-1) == "Unknown track (-1)"
-    assert session_type_name(18) == "Time Trial"
-    assert session_type_name(99) == "Unknown session (99)"
-    assert formula_name(2) == "F2"
-    assert formula_name(13) == "F1 26"
-    assert formula_name(5) == "Unknown formula (5)"

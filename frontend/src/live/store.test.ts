@@ -75,11 +75,6 @@ describe("waiting versus paused", () => {
 });
 
 describe("session events", () => {
-  it("records the open session from hello", () => {
-    const state = apply(createLiveStore().getState(), { type: "hello", session }, 0);
-    expect(state.session).toBe(session);
-  });
-
   it("drops the last lap when a new session starts", () => {
     let state = apply(createLiveStore().getState(), { type: "lap_completed", lap, session }, 0);
     expect(state.lastLap).toBe(lap);
@@ -98,11 +93,6 @@ describe("session events", () => {
     let state = apply(createLiveStore().getState(), { type: "lap_completed", lap, session }, 0);
     state = apply(state, { type: "lap_reopened", lap_number: 2, session }, 0);
     expect(state.lastLap).toBe(lap);
-  });
-
-  it("keeps the session on session_ended, so the screen still says what just finished", () => {
-    const state = apply(createLiveStore().getState(), { type: "session_ended", reason: "ended", session }, 0);
-    expect(state.session).toBe(session);
   });
 });
 

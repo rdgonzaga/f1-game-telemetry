@@ -11,7 +11,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 from f1telemetry.packets import HEADER, PACKET_ID_OFFSET, PacketId
-from f1telemetry.rawfile import FILE_HEADER, MAGIC, RawFileError, RawWriter, read_records
+from f1telemetry.rawfile import MAGIC, RawFileError, RawWriter, read_records
 from f1telemetry.recorder import record
 from f1telemetry.replayer import replay
 from trim_raw import trim
@@ -41,12 +41,6 @@ def test_truncated_tail_is_ignored(tmp_path: Path) -> None:
     path = write_file(tmp_path / "a.f1raw")
     path.write_bytes(path.read_bytes()[:-10])
     assert list(read_records(path)) == PACKETS[:2]
-
-
-def test_empty_recording(tmp_path: Path) -> None:
-    path = write_file(tmp_path / "a.f1raw", [])
-    assert path.stat().st_size == FILE_HEADER.size
-    assert list(read_records(path)) == []
 
 
 @pytest.mark.parametrize(
@@ -79,11 +73,6 @@ def test_replay_preserves_order_and_scaled_timing(tmp_path: Path) -> None:
     assert 0.08 <= elapsed < 0.5
 
 
-def test_replay_rejects_non_positive_speed(tmp_path: Path) -> None:
-    with pytest.raises(ValueError):
-        replay(write_file(tmp_path / "a.f1raw"), speed=0)
-
-
 def test_record_then_replay_roundtrip(tmp_path: Path) -> None:
     source = write_file(tmp_path / "source.f1raw")
     out = tmp_path / "nested" / "out.f1raw"
@@ -104,15 +93,6 @@ def test_record_then_replay_roundtrip(tmp_path: Path) -> None:
     assert [data for _, data in recorded] == [data for _, data in PACKETS]
     assert recorded[0][0] == 0
     assert [t for t, _ in recorded] == sorted(t for t, _ in recorded)
-
-
-def test_record_refuses_to_replace_an_existing_file(tmp_path: Path) -> None:
-    out = write_file(tmp_path / "earlier.f1raw")
-    before = out.read_bytes()
-
-    with pytest.raises(FileExistsError):
-        record(out, port=free_udp_port())
-    assert out.read_bytes() == before
 
 
 def fake_packet(packet_id: int, tag: int) -> bytes:

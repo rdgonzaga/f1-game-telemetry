@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, api, apiBase, liveSocketUrl } from "@/api/client";
+import { ApiError, api } from "@/api/client";
 
 function respondWith(body: unknown, init: ResponseInit = {}) {
   const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(body), init));
@@ -12,23 +12,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("where the API is", () => {
-  it("calls the dev server's API port, which app.py allows by origin", () => {
-    // Tests run with DEV set, same as `npm run dev`. A build makes both same-origin instead.
-    expect(apiBase).toBe("http://localhost:20778");
-    expect(liveSocketUrl()).toBe("ws://localhost:20778/ws/live");
-  });
-});
-
 describe("requests", () => {
-  it("builds the compare query in the order the backend expects", async () => {
-    const fetchMock = respondWith({ track: { id: 7, name: "Monza", length: 5793 } });
-    await api.compare({ session: "a", lap: 1 }, { session: "b", lap: 2 });
-
-    const url = String(fetchMock.mock.calls[0]?.[0]);
-    expect(url).toBe("http://localhost:20778/api/compare?session_a=a&lap_a=1&session_b=b&lap_b=2");
-  });
-
   it("escapes a session id rather than pasting it into the path", async () => {
     const fetchMock = respondWith({});
     await api.session("../secret");

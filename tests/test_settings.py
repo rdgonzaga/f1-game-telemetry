@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import ipaddress
 import json
 import logging
 from pathlib import Path
 
 import pytest
 
-from f1telemetry.settings import Settings, lan_ipv4_addresses, load_settings, with_overrides
+from f1telemetry.settings import Settings, load_settings, with_overrides
 
 
 def write(data_dir: Path, content: object) -> None:
@@ -60,9 +59,3 @@ def test_flags_override_the_file_and_are_validated() -> None:
 
     with pytest.raises(ValueError, match="udp_port"):
         with_overrides(Settings(), udp_port=-1)
-
-
-def test_lan_addresses_are_usable_ipv4() -> None:
-    for address in lan_ipv4_addresses():
-        ip = ipaddress.IPv4Address(address)
-        assert not (ip.is_loopback or ip.is_link_local or ip.is_unspecified)

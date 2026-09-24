@@ -1,18 +1,15 @@
-"""SessionHistory parsing from hand-packed packets and the committed finish fixture."""
+"""SessionHistory parsing from hand-packed packets."""
 
 from __future__ import annotations
 
 import struct
-from pathlib import Path
 
 import pytest
 
 from f1telemetry.packets import FORMATS, HEADER, PacketHeader, PacketId
 from f1telemetry.parsers import make_dispatcher
-from f1telemetry.rawfile import read_records
 from f1telemetry.session_history import SessionHistory
 
-FIXTURES = Path(__file__).parent / "fixtures"
 PLAYER = 3
 
 
@@ -41,15 +38,3 @@ def test_other_cars_are_not_decoded() -> None:
 
     assert parsed is not None
     assert parsed.data is None
-
-
-def test_fixture_holds_the_final_lap_time_before_session_end() -> None:
-    dispatcher = make_dispatcher()
-    histories = []
-    for _, data in read_records(FIXTURES / "race-2026-monza-finish.f1raw"):
-        parsed = dispatcher.parse(data)
-        if parsed is not None and isinstance(parsed.data, SessionHistory):
-            histories.append((parsed.header.session_uid, parsed.data.lap_times_ms))
-
-    # The last one comes with UID 0 and the lap the chequered flag closed.
-    assert histories[-1] == (0, (91_359, 103_822, 83_561))

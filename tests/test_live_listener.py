@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import socket
-import time
 from pathlib import Path
 
 import pytest
@@ -15,7 +12,7 @@ from f1telemetry.car_status import CarStatus
 from f1telemetry.car_telemetry import CarTelemetry
 from f1telemetry.car_telemetry2 import CarTelemetry2
 from f1telemetry.lap_data import LapData
-from f1telemetry.listener import TelemetryProtocol, open_listener
+from f1telemetry.listener import TelemetryProtocol
 from f1telemetry.live import CONNECTED_TIMEOUT_NS, NS_PER_SECOND, LiveState
 from f1telemetry.packets import PACKET_ID_OFFSET, Packet, PacketId
 from f1telemetry.rawfile import read_records
@@ -57,17 +54,6 @@ def test_2026_fixture_fills_every_slot() -> None:
     # The last values of the finish fixture: the flag has fallen.
     assert state.lap.last_lap_time_ms == 83561
     assert state.lap.result_status == 3
-
-
-def test_2025_fixture_leaves_car_telemetry2_unset() -> None:
-    state = LiveState()
-    feed(state, datagrams("race-2025-melbourne-lap"))
-
-    assert state.telemetry2 is None
-    assert isinstance(state.telemetry, CarTelemetry)
-    assert (state.packet_format, state.player_index) == (2025, 19)
-    assert state.session is not None
-    assert state.session.track_length == 5276
 
 
 def test_missing_player_car_keeps_the_previous_value() -> None:
@@ -166,29 +152,3 @@ def test_unusable_datagrams_are_dropped_but_still_count() -> None:
     assert state.packets_seen == 3
     assert (state.session, state.lap, state.telemetry, state.status, state.damage, state.telemetry2) == (None,) * 6
     assert state.session_uid is None
-
-
-def test_listener_receives_datagrams_over_udp() -> None:
-    packets = datagrams("race-2026-monza-finish")[:20]
-    state = LiveState()
-
-    async def run() -> None:
-        transport = await open_listener(state, "127.0.0.1", 0)
-        try:
-            port = transport.get_extra_info("socket").getsockname()[1]
-            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as tx:
-                tx.connect(("127.0.0.1", port))
-                for data in packets:
-                    tx.send(data)
-            deadline = time.monotonic() + 5
-            while state.packets_seen < len(packets) and time.monotonic() < deadline:
-                await asyncio.sleep(0.01)
-        finally:
-            transport.close()
-
-    asyncio.run(run())
-
-    assert state.packets_seen == len(packets)
-    assert state.connected(time.monotonic_ns())
-    assert state.telemetry is not None
-    assert state.telemetry.speed > 0

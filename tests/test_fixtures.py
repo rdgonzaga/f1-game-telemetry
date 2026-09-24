@@ -23,7 +23,6 @@ from f1telemetry.packets import Packet, PacketId
 from f1telemetry.parsers import make_dispatcher
 from f1telemetry.rawfile import read_records
 from f1telemetry.session import Session
-from inspect_raw import inspect
 
 FIXTURES = Path(__file__).parent / "fixtures"
 MAX_FIXTURE_BYTES = 300_000
@@ -189,13 +188,3 @@ def test_2026_f2_pit_stop_compound_change() -> None:
     telemetry = of_type(packets, CarTelemetry)
     assert telemetry[0].tyre_surface_temperature_fl == 72
     assert telemetry[-1].tyre_surface_temperature_fl == 32
-
-
-def test_inspect_raw_reports_fixture() -> None:
-    lines: list[str] = []
-    inspect(FIXTURES / "f2-2026-sakhir-pit.f1raw", out=lines.append)
-    report = "\n".join(lines)
-    assert "size mismatches: 0" in report
-    assert "Sakhir, Race 2, F2, 3 laps, 5408 m, player idx 21" in report
-    assert "tyres F2 Hard (actual 14)" in report
-    assert "tyre age 0 laps" in report

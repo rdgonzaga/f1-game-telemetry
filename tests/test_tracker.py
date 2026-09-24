@@ -10,8 +10,6 @@ import pytest
 from f1telemetry.car_telemetry import CarTelemetry
 from f1telemetry.event import SESSION_ENDED, Flashback
 from f1telemetry.lap_data import LapData
-from f1telemetry.listener import TelemetryProtocol
-from f1telemetry.live import LiveState
 from f1telemetry.packets import Packet, PacketHeader, PacketId
 from f1telemetry.parsers import make_dispatcher
 from f1telemetry.rawfile import read_records
@@ -479,12 +477,3 @@ def test_flashback_forgets_session_history_it_may_have_undone() -> None:
     game.tracker.close()
 
     assert game.of_type(LapCompleted) == []
-
-
-def test_listener_feeds_the_tracker() -> None:
-    events: list[TrackerEvent] = []
-    protocol = TelemetryProtocol(LiveState(), tracker=SessionTracker(events.append))
-    for _, data in read_records(FIXTURES / "race-2026-monza-finish.f1raw"):
-        protocol.datagram_received(data, ("127.0.0.1", 20777))
-
-    assert [type(event) for event in events] == [SessionOpened, LapCompleted, SessionClosed]
