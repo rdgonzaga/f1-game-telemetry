@@ -1,5 +1,5 @@
-import { ComingIn } from "@/components/ComingIn";
 import { CarPanel } from "@/components/live/CarPanel";
+import { PowerPanel } from "@/components/live/PowerPanel";
 import { TimingPanel } from "@/components/live/TimingPanel";
 import { TyrePanel } from "@/components/live/TyrePanel";
 
@@ -17,7 +17,7 @@ export default function Live() {
       <CarPanel />
       <TyrePanel />
       <TimingPanel />
-      <ComingIn title="ERS and aero" issue={26} what="ERS store and deployment, overtake, and 2026 active aero." />
+      <PowerPanel />
     </div>
   );
 }
