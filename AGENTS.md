@@ -48,7 +48,7 @@ uv run python tools/bench_parse.py                            # parse time per p
 - `tools/` developer scripts (inspector, trimmer and parse benchmark)
 - `docs/udp-spec.md` packet layouts, format differences and real-game behaviour the backend relies on
 - `docs/design.md` the design direction, colour semantics and state rules the tokens encode; if a component seems to need a new design decision, it belongs there or in `tokens.css`, not in the component
-- `tests/` pytest suite; small committed recordings go in `tests/fixtures/` (see its README)
+- `tests/` pytest suite; small committed recordings go in `tests/fixtures/` (see its README); what belongs there is under Testing below
 - `recordings/`, `data/` local, gitignored
 
 ## Performance rules
@@ -59,6 +59,12 @@ Efficiency is a hard requirement; the dashboard must never feel laggy.
 - Keep blocking disk I/O off the asyncio loop.
 - Throttle live WebSocket snapshots (30 Hz).
 - Frontend: never trigger a React re-render per telemetry frame; write live gauges through refs and `requestAnimationFrame`.
+
+## Testing
+
+- Never write unit tests after you write code.
+- Highly prefer E2E tests as the sole testing mechanism, and use them to verify complex features work. Here that means replaying a real `.f1raw` from `tests/fixtures/` through the app (`tests/test_app.py`, `tests/test_fixtures.py`). An E2E test ends in a verifiable, repeatable artifact: a committed fixture plus the saved session, lap or feed output asserted from it.
+- If you must test a system in isolation, first write down all the ways it could fail, then write the code. The performance rules above and measured game behaviour no recording contains are the usual reasons to.
 
 ## Conventions
 
