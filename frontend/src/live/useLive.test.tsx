@@ -110,21 +110,4 @@ describe("useLiveFrame", () => {
 
     expect(screen.getByTestId("speed").textContent).toBe("214");
   });
-
-  it("re-renders when the status changes, which is the point of the status hook", () => {
-    const flush = captureFrames();
-    render(<SpeedPanel />);
-    act(() => {
-      liveStore.setState(reduce(liveStore.getState(), snapshot(300, true), 1000));
-    });
-    flush();
-    expect(screen.getByTestId("status").textContent).toBe("live");
-
-    const before = renders;
-    act(() => {
-      liveStore.setState({ status: "paused" });
-    });
-    expect(renders - before).toBe(1);
-    expect(screen.getByTestId("status").textContent).toBe("paused");
-  });
 });

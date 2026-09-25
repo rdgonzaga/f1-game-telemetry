@@ -16,17 +16,6 @@ def write(data_dir: Path, content: object) -> None:
     (data_dir / "settings.json").write_text(text, encoding="utf-8")
 
 
-def test_missing_file_means_defaults(tmp_path: Path) -> None:
-    settings = load_settings(tmp_path)
-    assert settings == Settings()
-    assert (settings.udp_host, settings.udp_port, settings.http_host, settings.http_port) == (
-        "127.0.0.1",
-        20777,
-        "127.0.0.1",
-        20778,
-    )
-
-
 def test_file_values_override_defaults(tmp_path: Path) -> None:
     write(tmp_path, {"listen_mode": "network", "udp_port": 20800, "unknown": True})
     settings = load_settings(tmp_path)

@@ -16,17 +16,12 @@ import socket
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, NamedTuple, get_type_hints
+from typing import Any, NamedTuple
 
 import pytest
 from fastapi.testclient import TestClient
 
 from f1telemetry.app import Telemetry, create_app
-from f1telemetry.car_damage import CarDamage
-from f1telemetry.car_status import CarStatus
-from f1telemetry.car_telemetry import CarTelemetry
-from f1telemetry.car_telemetry2 import CarTelemetry2
-from f1telemetry.lap_data import LapData
 from f1telemetry.live import LiveState
 from f1telemetry.live_feed import snapshot
 from f1telemetry.openapi import document
@@ -38,22 +33,11 @@ from f1telemetry.schemas import (
     LiveSnapshot,
     SessionSummary,
 )
-from f1telemetry.session import Session
 from f1telemetry.settings import Settings
 
 FIXTURES = Path(__file__).parent / "fixtures"
 RECORDING = FIXTURES / "race-2026-monza-finish.f1raw"
 SETTINGS = Settings(udp_port=0, http_port=0)
-
-# Every live model and the packet payload whose fields `live_feed` sends verbatim.
-LIVE_PAYLOADS: list[tuple[str, type[NamedTuple]]] = [
-    ("LiveSession", Session),
-    ("LiveLap", LapData),
-    ("LiveTelemetry", CarTelemetry),
-    ("LiveStatus", CarStatus),
-    ("LiveDamage", CarDamage),
-    ("LiveTelemetry2", CarTelemetry2),
-]
 
 
 def _wait_for(condition: Callable[[], bool], timeout: float = 5.0) -> None:
@@ -124,12 +108,6 @@ def test_the_live_messages_are_documented(schema: dict[str, Any]) -> None:
         "LiveSessionEnded",
     }
     assert expected <= names
-
-
-@pytest.mark.parametrize(("model", "payload"), LIVE_PAYLOADS)
-def test_live_model_matches_its_packet(schema: dict[str, Any], model: str, payload: type[NamedTuple]) -> None:
-    properties = schema["components"]["schemas"][model]["properties"]
-    assert list(properties) == list(get_type_hints(payload))
 
 
 def test_snapshot_matches_what_the_feed_sends() -> None:

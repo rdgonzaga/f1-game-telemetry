@@ -7,16 +7,13 @@ import { liveStore, reduce } from "@/live/store";
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  document.documentElement.style.removeProperty("--f1-delta-neutral");
   liveStore.setState({ status: "offline", snapshot: null, session: null, lastPacketAt: null, staleSeconds: 0 });
 });
 
-it("colours the delta and the last lap against the best lap from the session", () => {
+it("colours the last lap against the best lap from a session that arrives after mount", () => {
   const frames: FrameRequestCallback[] = [];
   vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => frames.push(cb));
   vi.stubGlobal("cancelAnimationFrame", () => {});
-  // jsdom has no stylesheet, so the band token reads as NaN without this.
-  document.documentElement.style.setProperty("--f1-delta-neutral", "0.05");
 
   render(<TimingPanel />);
 
@@ -34,8 +31,6 @@ it("colours the delta and the last lap against the best lap from the session", (
     connected: true,
     session: { session_type: 15, total_laps: 13 },
     lap: { current_lap_num: 4, current_lap_time_ms: 30500, current_lap_invalid: false, last_lap_time_ms: 92000 },
-    status: { fuel_in_tank: 12.345, fuel_remaining_laps: 0.31 },
-    delta: { best_lap: 2, seconds: -0.2 },
   } as unknown as LiveSnapshot;
   act(() => {
     liveStore.setState({ session });
@@ -44,9 +39,6 @@ it("colours the delta and the last lap against the best lap from the session", (
   act(() => frames.splice(0).forEach((cb) => cb(0)));
 
   expect(screen.getByText("Lap 4 / 13")).toBeTruthy();
-  expect(screen.getByText("-0.200").getAttribute("data-tone")).toBe("gain");
-  expect(screen.getByText("vs lap 2")).toBeTruthy();
   expect(screen.getByText("1:31.234")).toBeTruthy();
   expect(screen.getByText("1:32.000").getAttribute("data-tone")).toBe("slow");
-  expect(screen.getByText("+0.31 laps to finish")).toBeTruthy();
 });

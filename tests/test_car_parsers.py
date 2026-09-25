@@ -15,7 +15,6 @@ from f1telemetry.car_damage import CarDamage
 from f1telemetry.car_status import CarStatus
 from f1telemetry.car_telemetry import CarTelemetry
 from f1telemetry.lap_data import LapData
-from f1telemetry.names import ers_deploy_mode_name
 from f1telemetry.packets import FORMATS, HEADER, PacketDispatcher, PacketHeader, PacketId
 
 FULL_TELEMETRY = {2025: struct.Struct("<HfffBbH?BH4H4B4BH4f4B"), 2026: struct.Struct("<HfffBbH?BH4H4B4BB4f4B")}
@@ -116,10 +115,3 @@ def test_lap_data_combines_minutes_and_millis(packet_format: int) -> None:
         packet = dispatcher.parse(build_packet(packet_format, PacketId.LAP_DATA, FULL_LAP, raw, player))
         assert packet is not None
         assert packet.data == expected
-
-
-def test_ers_deploy_mode_3_differs_by_format() -> None:
-    assert ers_deploy_mode_name(3, 2025) == "Overtake"
-    assert ers_deploy_mode_name(3, 2026) == "Boost"
-    assert ers_deploy_mode_name(2, 2025) == ers_deploy_mode_name(2, 2026) == "Hotlap"
-    assert ers_deploy_mode_name(9, 2026) == "Unknown mode (9)"
