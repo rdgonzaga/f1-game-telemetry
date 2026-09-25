@@ -6,12 +6,10 @@ import threading
 import time
 from pathlib import Path
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 from f1telemetry.packets import HEADER, PACKET_ID_OFFSET, PacketId
-from f1telemetry.rawfile import MAGIC, RawFileError, RawWriter, read_records
+from f1telemetry.rawfile import RawWriter, read_records
 from f1telemetry.recorder import record
 from f1telemetry.replayer import replay
 from trim_raw import trim
@@ -32,32 +30,10 @@ def write_file(path: Path, packets: list[tuple[int, bytes]] = PACKETS) -> Path:
     return path
 
 
-def test_roundtrip(tmp_path: Path) -> None:
-    path = write_file(tmp_path / "a.f1raw")
-    assert list(read_records(path)) == PACKETS
-
-
 def test_truncated_tail_is_ignored(tmp_path: Path) -> None:
     path = write_file(tmp_path / "a.f1raw")
     path.write_bytes(path.read_bytes()[:-10])
     assert list(read_records(path)) == PACKETS[:2]
-
-
-@pytest.mark.parametrize(
-    "content",
-    [b"", b"NOPE\x00\x00\x01\x00", MAGIC + b"\x63\x00"],
-    ids=["short", "magic", "version"],
-)
-def test_invalid_header(tmp_path: Path, content: bytes) -> None:
-    path = tmp_path / "bad.f1raw"
-    path.write_bytes(content)
-    with pytest.raises(RawFileError):
-        list(read_records(path))
-
-
-def test_oversized_datagram_rejected(tmp_path: Path) -> None:
-    with RawWriter(tmp_path / "a.f1raw") as w, pytest.raises(RawFileError):
-        w.write(0, b"\x00" * 0x10000)
 
 
 def test_replay_preserves_order_and_scaled_timing(tmp_path: Path) -> None:

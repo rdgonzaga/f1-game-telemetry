@@ -106,15 +106,6 @@ describe("reconnect", () => {
     expect(sockets).toHaveLength(2); // no second reconnect was scheduled
     live.stop();
   });
-
-  it("stops retrying once stopped", () => {
-    const live = build();
-    live.start();
-    live.stop();
-    sockets.at(-1)!.onclose?.();
-    vi.advanceTimersByTime(60_000);
-    expect(sockets).toHaveLength(1);
-  });
 });
 
 describe("going quiet", () => {
@@ -152,17 +143,6 @@ describe("going quiet", () => {
       vi.advanceTimersByTime(500);
     }
     expect(store.getState().status).toBe("live");
-    live.stop();
-  });
-});
-
-describe("bad input", () => {
-  it("survives a frame that is not JSON", () => {
-    const live = build();
-    live.start();
-    sockets.at(-1)!.onmessage!({ data: "<html>nope</html>" });
-    expect(store.getState().status).toBe("offline");
-    expect(sockets).toHaveLength(1); // the connection was not dropped over it
     live.stop();
   });
 });

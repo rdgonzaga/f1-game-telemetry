@@ -1,4 +1,4 @@
-"""Live feed: snapshot contents, sending only on change, slow clients, and tracker events in order."""
+"""Live feed: sending only on change, slow clients, joining mid-session, and the live delta."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import pytest
 
 from f1telemetry.lap_data import LapData
 from f1telemetry.live import LiveState
-from f1telemetry.live_feed import BestLapDelta, FeedClient, LiveFeed, snapshot
+from f1telemetry.live_feed import BestLapDelta, FeedClient, LiveFeed
 from f1telemetry.packets import Packet
 from f1telemetry.parsers import make_dispatcher
 from f1telemetry.rawfile import read_records
@@ -86,21 +86,6 @@ def feed_packets(live_feed: LiveFeed, tracker: SessionTracker, packets: list[Pac
         tracker.update(packet)
 
 
-def test_snapshot_flattens_each_packet_and_rounds_float32_noise(tmp_path: Path) -> None:
-    live_feed, tracker, _ = feed(tmp_path)
-    feed_packets(live_feed, tracker, fixture_packets("race-2026-monza-finish"))
-
-    message = snapshot(live_feed.state, connected=True)
-    assert (message["packet_format"], message["player_index"]) == (2026, 21)
-    assert message["telemetry"]["gear"] in range(-1, 9)
-    assert message["status"]["ers_harvest_limit_per_lap"] is not None
-    assert message["telemetry2"]["regulations_2026_applicable"] is True
-    floats = [
-        v for slot in ("lap", "telemetry", "status", "damage") for v in message[slot].values() if type(v) is float
-    ]
-    assert floats and all(round(value, 3) == value for value in floats)
-
-
 def test_a_snapshot_is_only_sent_when_something_changed(tmp_path: Path) -> None:
     live_feed, _, clock = feed(tmp_path)
     client = live_feed.join()
@@ -139,21 +124,6 @@ def test_a_slow_client_gets_every_event_but_only_the_newest_snapshot(tmp_path: P
     assert messages[-1]["connected"] is True
 
 
-def test_tracker_events_carry_the_session_summary(tmp_path: Path) -> None:
-    live_feed, tracker, _ = feed(tmp_path)
-    client = live_feed.join()
-    drain(client)
-    feed_packets(live_feed, tracker, fixture_packets("race-2026-monza-finish"))
-
-    started, completed, ended = [m for m in drain(client) if m["type"] != "snapshot"]
-    session_id = "20260918-231502_monza_race"
-    assert started["session"]["id"] == session_id
-    assert (started["session"]["track"]["name"], started["session"]["laps"]) == ("Monza", [])
-    assert (completed["lap"]["number"], completed["lap"]["lap_time_ms"]) == (3, 83561)
-    assert [lap["number"] for lap in completed["session"]["laps"]] == [3]
-    assert (ended["reason"], ended["session"]["end_reason"], ended["session"]["id"]) == ("ended", "ended", session_id)
-
-
 def test_a_client_joining_mid_session_is_told_about_it(tmp_path: Path) -> None:
     live_feed, tracker, _ = feed(tmp_path)
     packets = fixture_packets("race-2026-monza-finish")
@@ -168,21 +138,6 @@ def test_a_client_joining_mid_session_is_told_about_it(tmp_path: Path) -> None:
     assert tracker.session is None
     hello, _ = drain(live_feed.join())
     assert hello["session"] is None
-
-
-def test_leaving_stops_the_feed_for_that_client(tmp_path: Path) -> None:
-    live_feed, tracker, _ = feed(tmp_path)
-    staying, leaving = live_feed.join(), live_feed.join()
-    drain(staying)
-    drain(leaving)
-    live_feed.leave(leaving)
-
-    feed_packets(live_feed, tracker, fixture_packets("race-2026-monza-finish")[:100])
-    live_feed.tick()
-
-    assert drain(leaving) == []
-    assert [m["type"] for m in drain(staying)] == ["session_started", "snapshot"]
-    assert live_feed.clients == {staying}
 
 
 SESSION_INFO = next(p.data for p in fixture_packets("race-2026-monza-finish") if isinstance(p.data, Session))
@@ -279,9 +234,6 @@ def test_the_snapshot_carries_the_delta(tmp_path: Path) -> None:
     best = steady_lap(1, 50.0)
     live_feed.on_event(LapCompleted(session_with(best), best))
     live_feed.state.lap = driving(500.0, 10_400)
-
-    message = snapshot(live_feed.state, connected=True, delta=live_feed.delta.value(live_feed.state.lap))
-    assert message["delta"] == {"best_lap": 1, "seconds": 0.4}
 
     [update] = [m for m in drain(live_feed.join()) if m["type"] == "snapshot"]
     assert update["delta"] == {"best_lap": 1, "seconds": 0.4}

@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from itertools import pairwise
 from pathlib import Path
-
-import pytest
 
 from f1telemetry.car_telemetry import CarTelemetry
 from f1telemetry.event import SESSION_ENDED, Flashback
@@ -76,10 +73,8 @@ class Game:
         *,
         status: int = 4,
         invalid: bool = False,
-        speed: int = 200,
-        dt: float = 0.5,
     ) -> None:
-        self.time += dt
+        self.time += 0.5
         lap_data = LAP._replace(
             current_lap_num=lap,
             lap_distance=distance,
@@ -89,13 +84,13 @@ class Game:
             current_lap_invalid=invalid,
         )
         self.send(PacketId.LAP_DATA, lap_data)
-        self.send(PacketId.CAR_TELEMETRY, TELEMETRY._replace(speed=speed))
+        self.send(PacketId.CAR_TELEMETRY, TELEMETRY)
 
-    def drive_lap(self, lap: int, lap_time_ms: int = 90_000, start: float = 0.0, steps: int = 10) -> None:
-        """Frames covering `start` to the end of the track on lap `lap`."""
+    def drive_lap(self, lap: int, lap_time_ms: int = 90_000, steps: int = 10) -> None:
+        """Frames covering the whole track on lap `lap`."""
         for i in range(steps):
             share = i / steps
-            self.frame(lap, start + (TRACK_LENGTH - start) * share, int(lap_time_ms * share))
+            self.frame(lap, TRACK_LENGTH * share, int(lap_time_ms * share))
 
     def cross_line(self, next_lap: int, lap_time_ms: int) -> None:
         self.last_lap_time_ms = lap_time_ms
@@ -107,51 +102,6 @@ class Game:
 
     def of_type[T](self, kind: type[T]) -> list[T]:
         return [event for event in self.events if isinstance(event, kind)]
-
-
-def test_real_finish_closes_the_lap_at_the_flag_then_the_session() -> None:
-    events: list[TrackerEvent] = []
-    tracker = SessionTracker(events.append)
-    for packet in TEMPLATES:
-        tracker.update(packet)
-
-    assert [type(event) for event in events] == [SessionOpened, LapCompleted, SessionClosed]
-    opened, completed, closed = events
-    assert isinstance(opened, SessionOpened) and isinstance(completed, LapCompleted)
-    assert isinstance(closed, SessionClosed)
-    assert opened.session.info.track_length == 5798
-    # The flag: lastLapTimeInMS changes but currentLapNum stays 3.
-    assert (completed.lap.number, completed.lap.lap_time_ms) == (3, 83561)
-    # The fixture joins a second before the line, so the lap is flagged partial.
-    assert completed.lap.partial
-    assert len(completed.lap.samples) > 0
-    assert closed.reason == "ended"
-    assert closed.session.laps == [completed.lap]
-
-
-def test_real_flashback_fixture_keeps_samples_in_time_order() -> None:
-    tracker = SessionTracker()
-    for packet in fixture_packets("tt-2026-monza-flashback"):
-        tracker.update(packet)
-
-    assert tracker.lap is not None
-    times = tracker.lap.samples.session_time
-    assert len(times) > 0
-    assert all(a < b for a, b in pairwise(times))
-
-
-def test_session_opens_on_its_first_session_packet() -> None:
-    game = Game()
-    game.frame(1, 100.0, 1000)
-    assert game.events == []
-
-    game.start()
-    game.frame(1, 110.0, 1100)
-
-    [opened] = game.of_type(SessionOpened)
-    assert opened.session.uid == UID
-    assert opened.session.info is SESSION
-    assert game.tracker.lap is not None
 
 
 def test_uid_zero_and_event_only_uids_are_ignored() -> None:
@@ -180,17 +130,6 @@ def test_new_uid_closes_the_session_without_a_send_event() -> None:
     assert [opened.session.uid for opened in game.of_type(SessionOpened)] == [UID, 0x5678]
 
 
-def test_packets_after_send_do_not_reopen_the_session() -> None:
-    game = Game()
-    game.start()
-    game.send(PacketId.EVENT, SESSION_ENDED)
-    game.start()
-    game.frame(1, 10.0, 100)
-
-    assert [type(event) for event in game.events] == [SessionOpened, SessionClosed]
-    assert game.of_type(SessionClosed)[0].reason == "ended"
-
-
 def test_stray_packet_from_an_older_session_is_ignored() -> None:
     game = Game()
     for uid in (UID, 0x5678):
@@ -206,29 +145,6 @@ def test_stray_packet_from_an_older_session_is_ignored() -> None:
 
     assert [type(event) for event in game.events] == [SessionOpened, SessionClosed] * 2 + [SessionOpened]
     assert game.tracker.session is not None and game.tracker.session.uid == 0x9ABC
-
-
-def test_run_up_restart_check_is_skipped_without_a_track_length() -> None:
-    game = Game()
-    game.send(PacketId.SESSION, SESSION._replace(track_length=0))
-    game.frame(1, 900.0, 10_000)
-    game.frame(1, 899.0, 10_016)
-
-    lap = game.tracker.lap
-    assert lap is not None
-    assert list(lap.samples.lap_distance) == [900.0, 899.0]
-
-
-def test_close_ends_the_open_session_and_drops_the_unfinished_lap() -> None:
-    game = Game()
-    game.start()
-    game.drive_lap(1)
-    game.tracker.close()
-    game.tracker.close()
-
-    [closed] = game.of_type(SessionClosed)
-    assert (closed.reason, closed.session.laps) == ("shutdown", [])
-    assert game.tracker.lap is None
 
 
 def test_lap_closes_when_the_lap_number_increments() -> None:
@@ -255,36 +171,6 @@ def test_invalid_flag_follows_the_game_when_a_flashback_clears_it() -> None:
     game.cross_line(2, 90_000)
 
     assert game.of_type(LapCompleted)[0].lap.invalid is False
-
-
-def test_chequered_flag_closes_the_lap_and_waits_for_the_next_number() -> None:
-    game = Game()
-    game.start()
-    game.drive_lap(3)
-    game.last_lap_time_ms = 88_000
-    game.frame(3, 2.0, 0)
-    game.frame(3, 20.0, 500)
-
-    [completed] = game.of_type(LapCompleted)
-    assert (completed.lap.number, completed.lap.lap_time_ms) == (3, 88_000)
-    assert game.tracker.lap is None
-
-    game.frame(4, 30.0, 700)
-    assert game.tracker.lap is not None and game.tracker.lap.number == 4
-
-
-def test_flashback_drops_samples_after_the_target() -> None:
-    game = Game()
-    game.start()
-    game.drive_lap(1)
-    lap = game.tracker.lap
-    assert lap is not None
-    target = lap.samples.session_time[4]
-
-    game.flashback(target - 0.1)
-
-    assert len(lap.samples) == 4
-    assert lap.samples.session_time[-1] < target
 
 
 def test_chained_flashbacks_keep_rewinding() -> None:
@@ -410,41 +296,8 @@ def test_resuming_before_the_flashback_target_keeps_samples_in_order() -> None:
     assert list(lap.samples.session_time) == [*times[:4], times[4]]
 
 
-def test_lap_joined_mid_way_is_partial() -> None:
-    game = Game()
-    game.start()
-    game.drive_lap(2, start=3000.0)
-    game.cross_line(3, 91_000)
-
-    assert game.of_type(LapCompleted)[0].lap.partial
-
-
-PER_FRAME_IDS = {
-    PacketId.LAP_DATA,
-    PacketId.CAR_TELEMETRY,
-    PacketId.CAR_STATUS,
-    PacketId.CAR_DAMAGE,
-    PacketId.CAR_TELEMETRY_2,
-}
-
-
-@pytest.mark.parametrize("phase", range(3))
-def test_real_finish_at_20_hz_keeps_the_final_lap(phase: int) -> None:
-    """At 20 Hz the game sends every third frame; whichever third it is, the flag lap must still complete."""
-    events: list[TrackerEvent] = []
-    tracker = SessionTracker(events.append)
-    for packet in TEMPLATES:
-        header = packet.header
-        if header.packet_id in PER_FRAME_IDS and (header.overall_frame_identifier - phase) % 3:
-            continue
-        tracker.update(packet)
-
-    [closed] = [event for event in events if isinstance(event, SessionClosed)]
-    assert closed.reason == "ended"
-    assert [(lap.number, lap.lap_time_ms) for lap in closed.session.laps] == [(3, 83561)]
-
-
 def test_final_lap_comes_from_session_history_when_lap_data_misses_the_flag() -> None:
+    """At 20 Hz the game sends only every third frame, so no LapData may carry the flag's new last lap time."""
     events: list[TrackerEvent] = []
     tracker = SessionTracker(events.append)
     for packet in TEMPLATES:

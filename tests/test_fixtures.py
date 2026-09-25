@@ -23,6 +23,7 @@ from f1telemetry.packets import Packet, PacketId
 from f1telemetry.parsers import make_dispatcher
 from f1telemetry.rawfile import read_records
 from f1telemetry.session import Session
+from f1telemetry.session_history import SessionHistory
 
 FIXTURES = Path(__file__).parent / "fixtures"
 MAX_FIXTURE_BYTES = 300_000
@@ -81,6 +82,7 @@ def test_2025_race_steady_slice() -> None:
     )
     assert (s.total_laps, s.track_length) == (5, 5276)
     assert s.active_aero_track_status is None
+    assert (s.sector2_lap_distance_start, s.sector3_lap_distance_start) == pytest.approx((1757.05, 3178.60), abs=0.01)
 
     # One second of flat-out driving at the game's 60 Hz rate, no dropped frames.
     lap_packets = [p for _, p in packets if isinstance(p.data, LapData)]
@@ -118,6 +120,9 @@ def test_2026_time_trial_flashback_and_invalid_lap() -> None:
     # Monza's first full active aero zone wraps the start/finish line.
     start, end = s.active_aero_zones_full[0]
     assert start > end
+    assert len(s.active_aero_zones_partial) == 3
+    assert s.active_aero_zones_partial[0] == pytest.approx((0.9651, 0.1520), abs=0.0001)
+    assert (s.sector2_lap_distance_start, s.sector3_lap_distance_start) == pytest.approx((1897.79, 3726.98), abs=0.01)
 
     flashback_header, flashback = next((p.header, p.data) for _, p in packets if isinstance(p.data, Flashback))
     assert flashback.frame_identifier == 44229
@@ -136,7 +141,9 @@ def test_2026_time_trial_flashback_and_invalid_lap() -> None:
     # Time Trial freezes tyre temperatures and the ERS store.
     assert {t.tyre_surface_temperature_fl for t in of_type(packets, CarTelemetry)} == {89}
     assert {st.ers_store_energy for st in of_type(packets, CarStatus)} == {4_000_000.0}
-    assert all(t2.regulations_2026_applicable for t2 in of_type(packets, CarTelemetry2))
+    telemetry2 = of_type(packets, CarTelemetry2)
+    assert all(t2.regulations_2026_applicable for t2 in telemetry2)
+    assert {(t2.overtake_available, t2.overtake_active, t2.active_aero_mode) for t2 in telemetry2} == {(True, True, 1)}
 
 
 def test_2026_race_finish_changes_last_lap_time_not_lap_number() -> None:
@@ -154,6 +161,8 @@ def test_2026_race_finish_changes_last_lap_time_not_lap_number() -> None:
     assert events[-1].data == SessionEnded()
     assert events[-1].header.frame_identifier == 0
     assert of_type(packets, Session)[-1].game_paused
+    # Only the player car's SessionHistory decodes; the other 36 are dropped.
+    assert of_type(packets, SessionHistory) == [SessionHistory((91359, 103822, 83561))]
 
     status = of_type(packets, CarStatus)[-1]
     assert status.ers_harvest_limit_per_lap == 6_000_000.0

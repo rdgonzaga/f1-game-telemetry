@@ -194,8 +194,12 @@ def test_live_feed_streams_snapshots_and_session_events(tmp_path: Path) -> None:
             snapshot = live.receive_json()
 
     assert [m["type"] for m in events] == ["session_started", "lap_completed", "session_ended"]
-    assert (events[1]["lap"]["number"], events[1]["lap"]["lap_time_ms"]) == (3, 83561)
+    # The recording joins a second before the line, so the lap is partial.
+    lap = events[1]["lap"]
+    assert (lap["number"], lap["lap_time_ms"], lap["partial"]) == (3, 83561, True)
+    assert [lap["number"] for lap in events[1]["session"]["laps"]] == [3]
     assert events[2]["session"]["id"] == events[0]["session"]["id"]
+    assert (events[2]["reason"], events[2]["session"]["end_reason"]) == ("ended", "ended")
     assert (snapshot["connected"], snapshot["packet_format"], snapshot["lap"]["current_lap_num"]) == (True, 2026, 3)
     # The client left, so the feed stops sending to it.
     assert telemetry.feed.clients == set()

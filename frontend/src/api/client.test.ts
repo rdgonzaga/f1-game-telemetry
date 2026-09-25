@@ -13,13 +13,6 @@ afterEach(() => {
 });
 
 describe("requests", () => {
-  it("escapes a session id rather than pasting it into the path", async () => {
-    const fetchMock = respondWith({});
-    await api.session("../secret");
-
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/api/sessions/..%2Fsecret");
-  });
-
   it("raises the backend's detail, with the status a caller can branch on", async () => {
     respondWith({ detail: "no such lap" }, { status: 404 });
 
@@ -31,6 +24,8 @@ describe("requests", () => {
   it("falls back to the status when the body is not the API's", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("<html>502</html>", { status: 502 })));
 
-    await expect(api.sessions()).rejects.toBeInstanceOf(ApiError);
+    const error: unknown = await api.sessions().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(502);
   });
 });

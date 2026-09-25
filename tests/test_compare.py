@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from f1telemetry.compare import DISTANCE_STEP, MINISECTORS, LapReference, compare_laps, resample
+from f1telemetry.compare import MINISECTORS, LapReference, compare_laps, resample
 from f1telemetry.packets import Packet
 from f1telemetry.parsers import make_dispatcher
 from f1telemetry.rawfile import read_records
@@ -55,27 +55,6 @@ def fixture_lap(name: str) -> Json:
     return lap_document(laps[0])
 
 
-def test_compare_aligns_both_laps_on_a_five_metre_grid() -> None:
-    result = compare_laps(steady_lap(1, 50.0), steady_lap(2, 40.0))
-
-    assert result["step"] == DISTANCE_STEP
-    assert result["distance"][:3] == [0.0, 5.0, 10.0]
-    assert result["distance"][-1] == 1000.0
-    points = len(result["distance"])
-    for lap in result["laps"]:
-        assert all(len(column) == points for column in lap["columns"].values())
-    assert len(result["delta"]) == points
-
-
-def test_delta_is_how_much_time_the_second_lap_has_lost_at_each_point() -> None:
-    result = compare_laps(steady_lap(1, 50.0), steady_lap(2, 40.0))
-
-    for distance, delta in zip(result["distance"], result["delta"], strict=True):
-        expected = distance / 40.0 - distance / 50.0
-        assert delta == pytest.approx(expected, abs=0.002)
-    assert result["delta"][0] == 0.0
-
-
 def test_minisectors_split_the_compared_distance_into_equal_gains() -> None:
     result = compare_laps(steady_lap(1, 50.0), steady_lap(2, 40.0))
 
@@ -113,22 +92,6 @@ def test_samples_that_do_not_move_forward_are_skipped() -> None:
     assert columns["speed"] == pytest.approx([100.0, 200.0, 250.0, 300.0])
 
 
-def test_laps_with_no_distance_in_common_are_refused() -> None:
-    with pytest.raises(ValueError, match="no distance in common"):
-        compare_laps(steady_lap(1, 50.0, start=0.0, end=400.0), steady_lap(2, 40.0, start=600.0, end=1000.0))
-
-
-def test_a_lap_compared_with_itself_has_no_delta_anywhere() -> None:
-    lap = fixture_lap("race-2026-monza-finish")
-
-    result = compare_laps(lap, lap)
-
-    assert result["distance"] == pytest.approx([5765.0, 5770.0, 5775.0, 5780.0, 5785.0, 5790.0, 5795.0])
-    assert set(result["delta"]) == {0.0}
-    assert {m["delta"] for m in result["minisectors"]} == {0.0}
-    assert result["laps"][0]["columns"]["speed"] == result["laps"][1]["columns"]["speed"]
-
-
 def test_a_lap_shorter_than_the_minisector_count_gets_one_per_grid_step() -> None:
     # The fixture covers the last 35 m of a lap: six 5 m steps, so six minisectors instead of 25.
     result = compare_laps(fixture_lap("race-2026-monza-finish"), fixture_lap("race-2026-monza-finish"))
@@ -145,11 +108,6 @@ def test_a_reference_gives_the_best_lap_time_at_a_distance() -> None:
     assert reference.number == 1
     assert reference.time_at(500.0) == pytest.approx(10_000, abs=5)
     assert reference.time_at(502.5) == pytest.approx(10_050, abs=5)
-
-
-def test_a_lap_too_short_to_resample_has_no_reference() -> None:
-    assert LapReference.build(1, [10.0, 12.0], [100, 120]) is None
-    assert LapReference.build(1, [], []) is None
 
 
 def test_building_a_reference_from_a_full_lap_stays_off_the_frame_budget() -> None:

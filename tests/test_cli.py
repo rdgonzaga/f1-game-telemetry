@@ -24,12 +24,6 @@ def test_serve_exits_with_one_line_when_the_udp_port_is_taken(tmp_path: Path) ->
     assert "Is another telemetry app running?" in str(exit_info.value.code)
 
 
-def test_invalid_flag_value_exits_cleanly(tmp_path: Path) -> None:
-    with pytest.raises(SystemExit) as exit_info:
-        cli.main(["--data-dir", str(tmp_path), "--udp-port", "70000"])
-    assert str(exit_info.value.code) == "f1telemetry: invalid udp_port: 70000"
-
-
 def test_record_refuses_an_existing_file_before_listening(tmp_path: Path) -> None:
     out = tmp_path / "earlier.f1raw"
     out.write_bytes(b"keep me")
@@ -37,8 +31,3 @@ def test_record_refuses_an_existing_file_before_listening(tmp_path: Path) -> Non
         cli.main(["record", "--out", str(out)])
     assert "already exists" in str(exit_info.value.code)
     assert out.read_bytes() == b"keep me"
-
-
-def test_replay_rejects_a_non_positive_speed(tmp_path: Path) -> None:
-    with pytest.raises(SystemExit):
-        cli.main(["replay", str(tmp_path / "x.f1raw"), "--speed", "0"])

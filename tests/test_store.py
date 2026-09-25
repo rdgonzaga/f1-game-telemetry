@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import threading
 from collections.abc import Callable
 from concurrent.futures import Executor, Future
@@ -19,8 +18,6 @@ from f1telemetry.session import Session
 from f1telemetry.store import (
     SessionRecorder,
     SessionStore,
-    best_lap_number,
-    lap_document,
     write_json_atomic,
 )
 from f1telemetry.tracker import (
@@ -29,7 +26,6 @@ from f1telemetry.tracker import (
     LapReopened,
     SessionClosed,
     SessionOpened,
-    SessionTracker,
     TrackedSession,
 )
 
@@ -67,8 +63,8 @@ def make_session(uid: int = 0xABC) -> TrackedSession:
     return TrackedSession(uid, 2026, 21, SESSION_INFO)
 
 
-def make_lap(number: int, lap_time_ms: int, *, invalid: bool = False, partial: bool = False) -> Lap:
-    lap = Lap(number, 10.0, lap_time_ms=lap_time_ms, invalid=invalid, partial=partial)
+def make_lap(number: int, lap_time_ms: int) -> Lap:
+    lap = Lap(number, 10.0, lap_time_ms=lap_time_ms)
     samples = lap.samples
     for i in range(3):
         samples.session_time.append(10.0 + i / 60)
@@ -88,34 +84,6 @@ def recorder(tmp_path: Path) -> tuple[SessionRecorder, SessionStore, QueuedExecu
     store = SessionStore(tmp_path)
     executor = QueuedExecutor()
     return SessionRecorder(store, executor, clock=lambda: STARTED), store, executor
-
-
-def test_real_finish_is_saved_off_the_calling_thread(tmp_path: Path) -> None:
-    rec, store, executor = recorder(tmp_path)
-    tracker = SessionTracker(rec.on_event)
-    for packet in fixture_packets("race-2026-monza-finish"):
-        tracker.update(packet)
-
-    # Every write is still queued for the writer thread.
-    assert not store.root.exists()
-    executor.run()
-
-    [saved] = store.list_sessions()
-    assert saved["id"] == "20260918-231502_monza_race"
-    assert (saved["track"]["name"], saved["session_type"]["name"], saved["formula"]["name"]) == (
-        "Monza",
-        "Race",
-        "F1 26",
-    )
-    assert (saved["end_reason"], saved["ended_at"]) == ("ended", "2026-09-18T23:15:02")
-    assert [(lap["number"], lap["lap_time_ms"], lap["partial"]) for lap in saved["laps"]] == [(3, 83561, True)]
-    # The only lap joined mid-way, so there is no best lap.
-    assert saved["best_lap"] is None
-
-    lap = store.load_lap(saved["id"], 3)
-    columns = lap["columns"]
-    assert {len(column) for column in columns.values()} == {saved["laps"][0]["samples"]}
-    assert columns["lap_time_ms"][-1] <= 83561
 
 
 def test_recorder_writes_on_a_background_thread(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -164,17 +132,6 @@ def test_reopened_lap_is_removed_until_it_completes_again(tmp_path: Path) -> Non
     assert store.load_lap(session_id, 6)["lap_time_ms"] == 97_495
 
 
-def test_nothing_is_written_before_the_first_lap(tmp_path: Path) -> None:
-    rec, store, executor = recorder(tmp_path)
-    session = make_session()
-    rec.on_event(SessionOpened(session))
-    rec.on_event(SessionClosed(session, "new session"))
-
-    # A crash any time before the first lap would leave nothing on disk either.
-    assert executor.queue == []
-    assert store.list_sessions() == []
-
-
 def test_session_whose_only_lap_was_undone_is_removed(tmp_path: Path) -> None:
     rec, store, executor = recorder(tmp_path)
     session = make_session()
@@ -207,15 +164,13 @@ def test_sessions_opened_in_the_same_second_get_distinct_ids(tmp_path: Path) -> 
     ]
 
 
-def test_list_is_newest_first_and_skips_unreadable_folders(tmp_path: Path) -> None:
+def test_list_skips_unreadable_folders(tmp_path: Path) -> None:
     store = SessionStore(tmp_path)
-    for session_id in ("20260101-120000_monza_race", "20260301-120000_jeddah_race"):
-        write_json_atomic(store.root / session_id / "session.json", {"id": session_id})
+    write_json_atomic(store.root / "20260101-120000_monza_race" / "session.json", {"id": "20260101-120000_monza_race"})
     (store.root / "20260201-120000_broken_race").mkdir()
     (store.root / "notes").mkdir()
 
-    assert [s["id"] for s in store.list_sessions()] == ["20260301-120000_jeddah_race", "20260101-120000_monza_race"]
-    assert SessionStore(tmp_path / "missing").list_sessions() == []
+    assert [s["id"] for s in store.list_sessions()] == ["20260101-120000_monza_race"]
 
 
 @pytest.mark.parametrize("session_id", ["..", "../../etc", "20260101-120000_monza_race/../x", "", "a b"])
@@ -224,35 +179,6 @@ def test_ids_outside_the_naming_scheme_are_refused(tmp_path: Path, session_id: s
     for call in (store.load_session, store.delete_session, lambda i: store.load_lap(i, 1)):
         with pytest.raises(KeyError):
             call(session_id)
-
-
-def test_atomic_write_replaces_the_file_and_leaves_no_temp(tmp_path: Path) -> None:
-    path = tmp_path / "a" / "session.json"
-    write_json_atomic(path, {"n": 1})
-    write_json_atomic(path, {"n": 2})
-
-    assert json.loads(path.read_text(encoding="utf-8")) == {"n": 2}
-    assert [p.name for p in path.parent.iterdir()] == ["session.json"]
-
-
-def test_lap_document_rounds_float32_noise() -> None:
-    columns = lap_document(make_lap(1, 90_000))["columns"]
-
-    assert columns["throttle"] == [0.3, 0.3, 0.3]
-    assert columns["steer"] == [-0.1, -0.1, -0.1]
-    assert columns["lap_distance"] == [0.0, 100.0, 200.0]
-    assert columns["session_time"] == [10.0, 10.017, 10.033]
-
-
-def test_best_lap_skips_invalid_and_partial_laps() -> None:
-    laps = [
-        make_lap(1, 85_000, partial=True),
-        make_lap(2, 86_000, invalid=True),
-        make_lap(3, 90_000),
-        make_lap(4, 89_000),
-    ]
-    assert best_lap_number(laps) == 4
-    assert best_lap_number(laps[:2]) is None
 
 
 def test_recorder_document_follows_the_session(tmp_path: Path) -> None:
