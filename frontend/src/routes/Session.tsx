@@ -1,9 +1,11 @@
-import { Link, useParams } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { api } from "@/api/client";
 import { useApi } from "@/api/useApi";
 import { Panel } from "@/components/Panel";
 import { LapTable } from "@/components/sessions/LapTable";
+import { Button } from "@/components/ui/button";
 import { formatStarted } from "@/lib/laps";
 import { formatLapTime } from "@/lib/timing";
 
@@ -44,13 +46,16 @@ export default function Session() {
             {data.session_type.name} · {data.formula.name} · {formatStarted(data.started_at)}
           </p>
         </div>
-        <div className="flex flex-col items-end">
-          <span className="tnum font-mono text-xl font-semibold text-timing-best">
-            {formatLapTime(best?.lap_time_ms)}
-          </span>
-          <span className="text-xs tracking-[var(--f1-tracking-label)] text-text-3 uppercase">
-            {best ? `Best lap · lap ${best.number}` : "No complete valid lap"}
-          </span>
+        <div className="flex items-end gap-6">
+          <div className="flex flex-col items-end">
+            <span className="tnum font-mono text-xl font-semibold text-timing-best">
+              {formatLapTime(best?.lap_time_ms)}
+            </span>
+            <span className="text-xs tracking-[var(--f1-tracking-label)] text-text-3 uppercase">
+              {best ? `Best lap · lap ${best.number}` : "No complete valid lap"}
+            </span>
+          </div>
+          {data.status !== "recording" && <DeleteSession sessionId={data.id} />}
         </div>
       </header>
 
@@ -65,6 +70,47 @@ export default function Session() {
           <p className="p-[var(--f1-panel-pad)] text-text-3">No lap was completed in this session.</p>
         )}
       </Panel>
+    </div>
+  );
+}
+
+/** Two clicks, the second on a red button, so a stray click can't lose a session. No browser dialog. */
+function DeleteSession({ sessionId }: { sessionId: string }) {
+  const navigate = useNavigate();
+  const [step, setStep] = useState<"idle" | "confirm" | "deleting">("idle");
+  const [failed, setFailed] = useState<string | null>(null);
+
+  if (step === "idle") {
+    return (
+      <Button variant="outline" onClick={() => setStep("confirm")}>
+        Delete
+      </Button>
+    );
+  }
+
+  const remove = () => {
+    setStep("deleting");
+    setFailed(null);
+    api.deleteSession(sessionId).then(
+      () => navigate("/sessions", { replace: true }),
+      (error: unknown) => {
+        setFailed(error instanceof Error ? error.message : String(error));
+        setStep("confirm");
+      },
+    );
+  };
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex gap-2">
+        <Button variant="ghost" disabled={step === "deleting"} onClick={() => setStep("idle")}>
+          Cancel
+        </Button>
+        <Button variant="destructive" disabled={step === "deleting"} onClick={remove}>
+          Delete session and laps
+        </Button>
+      </div>
+      {failed && <p className="text-sm text-critical">Couldn&rsquo;t delete: {failed}</p>}
     </div>
   );
 }
