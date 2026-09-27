@@ -8,6 +8,7 @@ import Live from "@/routes/Live";
 // Live is bundled with the shell because it is the route the app opens on. Analysis routes are only reached
 // after a session has been saved, so they are split out and fetched when first visited.
 const Sessions = lazy(() => import("@/routes/Sessions"));
+const Session = lazy(() => import("@/routes/Session"));
 const LapDetail = lazy(() => import("@/routes/LapDetail"));
 const Compare = lazy(() => import("@/routes/Compare"));
 const Setup = lazy(() => import("@/routes/Setup"));
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Live /> },
       { path: "sessions", element: deferred(Sessions) },
+      { path: "sessions/:sessionId", element: deferred(Session) },
       { path: "sessions/:sessionId/laps/:lapNumber", element: deferred(LapDetail) },
       { path: "compare", element: deferred(Compare) },
       { path: "setup", element: deferred(Setup) },
