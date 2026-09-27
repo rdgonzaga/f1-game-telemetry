@@ -55,6 +55,11 @@ export default function Session() {
               {best ? `Best lap · lap ${best.number}` : "No complete valid lap"}
             </span>
           </div>
+          {data.laps.length > 1 && (
+            <Button variant="outline" asChild>
+              <Link to={`/compare?session=${encodeURIComponent(data.id)}`}>Compare laps</Link>
+            </Button>
+          )}
           {data.status !== "recording" && <DeleteSession sessionId={data.id} />}
         </div>
       </header>

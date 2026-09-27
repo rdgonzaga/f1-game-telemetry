@@ -6,6 +6,7 @@ import type { LapDocument } from "@/api/types";
 import { useApi } from "@/api/useApi";
 import { Trace, type TraceSeries } from "@/components/charts/Trace";
 import { Panel } from "@/components/Panel";
+import { formatLapRef } from "@/lib/compare";
 import { formatSectorTime } from "@/lib/laps";
 import { formatLapTime } from "@/lib/timing";
 import { numberToken } from "@/lib/tokens";
@@ -36,6 +37,7 @@ export default function LapDetail() {
   }
 
   const data = lap.data;
+  const bestLap = session.state === "ready" ? session.data.best_lap : null;
   return (
     <div className="flex flex-col gap-[var(--f1-gap)]">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -44,6 +46,17 @@ export default function LapDetail() {
             <Link to={back} className="hover:text-text-2 hover:underline">
               {session.state === "ready" ? `${session.data.track.name} · ${session.data.session_type.name}` : "Session"}
             </Link>
+            {bestLap != null && bestLap !== data.number && (
+              <Link
+                to={`/compare?${new URLSearchParams({
+                  a: formatLapRef({ session: sessionId, lap: data.number }),
+                  b: formatLapRef({ session: sessionId, lap: bestLap }),
+                }).toString()}`}
+                className="text-text-2 hover:underline"
+              >
+                Compare with best lap
+              </Link>
+            )}
           </p>
           <h1 className="text-2xl font-extrabold tracking-[var(--f1-tracking-display)] text-text-1">
             Lap {data.number}
