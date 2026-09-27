@@ -37,7 +37,8 @@ from f1telemetry.tracker import (
 
 log = logging.getLogger(__name__)
 
-FILE_VERSION = 1
+# 2 added sector times and the tyre, fuel, ERS and position columns.
+FILE_VERSION = 2
 SESSION_FILE = "session.json"
 LAPS_DIR = "laps"
 # Folder names are the session ids the API takes, so anything else is refused before it touches the disk.
@@ -71,6 +72,7 @@ def lap_summary(lap: Lap) -> Json:
         "invalid": lap.invalid,
         "partial": lap.partial,
         "samples": len(lap.samples),
+        "sector_times_ms": list(lap.sector_times_ms),
     }
 
 
@@ -127,6 +129,19 @@ def lap_document(lap: Lap) -> Json:
             "gear": samples.gear.tolist(),
             "engine_rpm": samples.engine_rpm.tolist(),
             "drs": samples.drs.tolist(),
+            "tyre_compound": samples.tyre_compound.tolist(),
+            "tyre_inner_temperature_rl": samples.tyre_inner_temperature_rl.tolist(),  # celsius
+            "tyre_inner_temperature_rr": samples.tyre_inner_temperature_rr.tolist(),
+            "tyre_inner_temperature_fl": samples.tyre_inner_temperature_fl.tolist(),
+            "tyre_inner_temperature_fr": samples.tyre_inner_temperature_fr.tolist(),
+            "tyre_wear_rl": _rounded(samples.tyre_wear_rl, 2),  # percent
+            "tyre_wear_rr": _rounded(samples.tyre_wear_rr, 2),
+            "tyre_wear_fl": _rounded(samples.tyre_wear_fl, 2),
+            "tyre_wear_fr": _rounded(samples.tyre_wear_fr, 2),
+            "fuel_in_tank": _rounded(samples.fuel_in_tank, 2),  # kg
+            "ers_store_mj": _rounded(samples.ers_store_mj, 3),
+            "world_x": _rounded(samples.world_x, 1),  # metres
+            "world_z": _rounded(samples.world_z, 1),
         },
     }
 

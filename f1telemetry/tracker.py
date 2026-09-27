@@ -26,11 +26,14 @@ from __future__ import annotations
 from array import array
 from bisect import bisect_left
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, replace
 
+from f1telemetry.car_damage import CarDamage
+from f1telemetry.car_status import CarStatus
 from f1telemetry.car_telemetry import CarTelemetry
 from f1telemetry.event import Flashback, SessionEnded
 from f1telemetry.lap_data import LapData
+from f1telemetry.motion import Motion
 from f1telemetry.packets import Packet, PacketId
 from f1telemetry.session import Session
 from f1telemetry.session_history import SessionHistory
@@ -46,7 +49,11 @@ LAP_RESTART_DROP_MS = 1000
 
 @dataclass(slots=True)
 class LapSamples:
-    """One row per CarTelemetry packet, stored as columns so a lap can be saved and charted without reshaping."""
+    """One row per CarTelemetry packet, stored as columns so a lap can be saved and charted without reshaping.
+
+    Status, damage and motion arrive at their own rates, so each row holds the latest of those seen, or 0 before the
+    first one.
+    """
 
     session_time: array[float] = field(default_factory=lambda: array("d"))
     lap_distance: array[float] = field(default_factory=lambda: array("f"))
@@ -58,23 +65,25 @@ class LapSamples:
     gear: array[int] = field(default_factory=lambda: array("b"))
     engine_rpm: array[int] = field(default_factory=lambda: array("H"))
     drs: array[int] = field(default_factory=lambda: array("B"))
+    tyre_compound: array[int] = field(default_factory=lambda: array("B"))  # visual compound id
+    tyre_inner_temperature_rl: array[int] = field(default_factory=lambda: array("H"))
+    tyre_inner_temperature_rr: array[int] = field(default_factory=lambda: array("H"))
+    tyre_inner_temperature_fl: array[int] = field(default_factory=lambda: array("H"))
+    tyre_inner_temperature_fr: array[int] = field(default_factory=lambda: array("H"))
+    tyre_wear_rl: array[float] = field(default_factory=lambda: array("f"))
+    tyre_wear_rr: array[float] = field(default_factory=lambda: array("f"))
+    tyre_wear_fl: array[float] = field(default_factory=lambda: array("f"))
+    tyre_wear_fr: array[float] = field(default_factory=lambda: array("f"))
+    fuel_in_tank: array[float] = field(default_factory=lambda: array("f"))
+    ers_store_mj: array[float] = field(default_factory=lambda: array("f"))
+    world_x: array[float] = field(default_factory=lambda: array("f"))
+    world_z: array[float] = field(default_factory=lambda: array("f"))
 
     def __len__(self) -> int:
         return len(self.session_time)
 
     def columns(self) -> tuple[array[float] | array[int], ...]:
-        return (
-            self.session_time,
-            self.lap_distance,
-            self.lap_time_ms,
-            self.speed,
-            self.throttle,
-            self.brake,
-            self.steer,
-            self.gear,
-            self.engine_rpm,
-            self.drs,
-        )
+        return tuple(getattr(self, column.name) for column in fields(self))
 
     def truncate_from(self, session_time: float) -> None:
         """Drop every sample at or after `session_time`. Times only rise within a lap once flashbacks are undone."""
@@ -88,18 +97,7 @@ class LapSamples:
             del column[:]
 
     def copy(self) -> LapSamples:
-        return LapSamples(
-            self.session_time[:],
-            self.lap_distance[:],
-            self.lap_time_ms[:],
-            self.speed[:],
-            self.throttle[:],
-            self.brake[:],
-            self.steer[:],
-            self.gear[:],
-            self.engine_rpm[:],
-            self.drs[:],
-        )
+        return replace(self, **{column.name: getattr(self, column.name)[:] for column in fields(self)})
 
 
 @dataclass(slots=True)
@@ -112,7 +110,17 @@ class Lap:
     partial: bool = False
     start_distance: float | None = None  # first non-negative lap distance seen
     end_distance: float = 0.0
+    # Caught on the way round: LapData resets them to 0 at the line, before the lap can be closed.
+    sector1_ms: int = 0
+    sector2_ms: int = 0
     samples: LapSamples = field(default_factory=LapSamples)
+
+    @property
+    def sector_times_ms(self) -> tuple[int, int, int]:
+        """Sectors 1-3; sector 3 only once the lap is closed with both others seen, else 0."""
+        s1, s2 = self.sector1_ms, self.sector2_ms
+        s3 = self.lap_time_ms - s1 - s2 if self.lap_time_ms and s1 and s2 else 0
+        return s1, s2, s3
 
     def reopened(self) -> Lap:
         """A copy to keep driving after a flashback, leaving the completed lap as it was reported."""
@@ -122,12 +130,15 @@ class Lap:
             invalid=self.invalid,
             start_distance=self.start_distance,
             end_distance=self.end_distance,
+            sector1_ms=self.sector1_ms,
+            sector2_ms=self.sector2_ms,
             samples=self.samples.copy(),
         )
 
     def restart(self, session_time: float) -> None:
         self.start_session_time = session_time
         self.start_distance = None
+        self.sector1_ms = self.sector2_ms = 0
         self.samples.clear()
 
 
@@ -204,6 +215,10 @@ class SessionTracker:
         self._last_lap_time_ms: int | None = None
         self._lap_data_time = 0.0  # session time of `_lap_data`
         self._history: tuple[int, ...] = ()  # the player's lap times from the latest SessionHistory
+        # The latest of each, held for every telemetry sample until the next arrives.
+        self._status: CarStatus | None = None
+        self._damage: CarDamage | None = None
+        self._motion: Motion | None = None
         self._ended: _Ended | None = None
 
     def update(self, packet: Packet) -> None:
@@ -233,6 +248,12 @@ class SessionTracker:
             self._sample(header.session_time, data)  # type: ignore[arg-type]
         elif packet_id == PacketId.LAP_DATA:
             self._on_lap_data(header.session_time, data)  # type: ignore[arg-type]
+        elif packet_id == PacketId.MOTION:
+            self._motion = data  # type: ignore[assignment]
+        elif packet_id == PacketId.CAR_STATUS:
+            self._status = data  # type: ignore[assignment]
+        elif packet_id == PacketId.CAR_DAMAGE:
+            self._damage = data  # type: ignore[assignment]
         elif packet_id == PacketId.EVENT:
             if isinstance(data, Flashback):
                 self._rewind(data.session_time)
@@ -328,6 +349,10 @@ class SessionTracker:
                     lap.start_session_time = session_time
                 lap.end_distance = distance
             lap.invalid = lap_data.current_lap_invalid
+            if lap_data.sector1_time_ms:
+                lap.sector1_ms = lap_data.sector1_time_ms
+            if lap_data.sector2_time_ms:
+                lap.sector2_ms = lap_data.sector2_time_ms
         self._lap_data = lap_data
         self._lap_data_time = session_time
         self._last_lap_time_ms = last_lap_time_ms
@@ -391,3 +416,19 @@ class SessionTracker:
         samples.gear.append(telemetry.gear)
         samples.engine_rpm.append(telemetry.engine_rpm)
         samples.drs.append(telemetry.drs)
+        samples.tyre_inner_temperature_rl.append(telemetry.tyre_inner_temperature_rl)
+        samples.tyre_inner_temperature_rr.append(telemetry.tyre_inner_temperature_rr)
+        samples.tyre_inner_temperature_fl.append(telemetry.tyre_inner_temperature_fl)
+        samples.tyre_inner_temperature_fr.append(telemetry.tyre_inner_temperature_fr)
+        status = self._status
+        samples.tyre_compound.append(status.visual_tyre_compound if status else 0)
+        samples.fuel_in_tank.append(status.fuel_in_tank if status else 0.0)
+        samples.ers_store_mj.append(status.ers_store_energy / 1e6 if status else 0.0)
+        damage = self._damage
+        samples.tyre_wear_rl.append(damage.tyre_wear_rl if damage else 0.0)
+        samples.tyre_wear_rr.append(damage.tyre_wear_rr if damage else 0.0)
+        samples.tyre_wear_fl.append(damage.tyre_wear_fl if damage else 0.0)
+        samples.tyre_wear_fr.append(damage.tyre_wear_fr if damage else 0.0)
+        motion = self._motion
+        samples.world_x.append(motion.world_x if motion else 0.0)
+        samples.world_z.append(motion.world_z if motion else 0.0)

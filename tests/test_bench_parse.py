@@ -9,6 +9,7 @@ from bench_parse import DEFAULT_BUDGET_US, FIXTURES, bench, load
 from f1telemetry.packets import PacketId
 
 PARSED_IDS = {
+    PacketId.MOTION,
     PacketId.SESSION,
     PacketId.LAP_DATA,
     PacketId.EVENT,
