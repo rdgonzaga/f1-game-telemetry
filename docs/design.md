@@ -114,7 +114,7 @@ the recordings, not from folklore.
 - **Tyre temperature tracks the carcass, not the surface.** Across three races the carcass stays
   inside 69-97 C while the surface swings 43-152 C *within a single lap*. Colouring the surface makes
   the widget strobe. Bands: 78 / 84 / 96 / 100 C. The surface is shown as a second, uncoloured number.
-- **There are two band sets, and the fitted compound picks between them.** Not the weather: a driver
+- **The fitted compound picks the band set.** Not the weather: a driver
   who stayed out on slicks in the rain is still on slicks, and that is the moment the grid most needs
   to be right. Intermediates measured per corner while racing through a storm at Spa run **46-72 C**,
   median 62, 90th percentile 70, against 69-97 for slicks. On the slick bands that whole race reads
@@ -123,8 +123,12 @@ the recordings, not from folklore.
 - **Full wets get a third set, because they run hotter than intermediates.** An 11-lap stint on
   compound 8 through a storm at Interlagos ran **61-91 C**, median 72, 90th percentile 86. On the
   intermediate bands that reads hot for most of the stint. Full-wet bands: 64 / 68 / 82 / 86 C.
-  Both wet sets were measured on medium traction control with a lot of feathered throttle, so a
-  committed drive on full TC may push them up.
+  A committed 5-lap drive on full TC at Zandvoort ran cooler (median 67, p90 71), so TC is not what
+  pushes these up; track and conditions move them more.
+- **F2 wets get a fourth set, because they run cooler than either F1 wet.** A 5-lap race on compound
+  15 on full TC in a storm at Suzuka ran **53-67 C**, median 61, 90th percentile 64, and was still
+  rising about 1 C a lap at the flag. F2 wet bands: 54 / 58 / 66 / 69 C. Classic wets (10) are
+  unmeasured and still take the slick set.
 - **Brakes:** 21-1011 C observed, median ~600, p95 ~900. Bands 200 / 800 / 950.
 - **Delta noise band:** 0.05 s. Inside it the delta reads neutral rather than flickering.
 - **Fuel margin:** a race margin below 0 laps (the car cannot reach the flag) reads as a loss, yellow. It is

@@ -6,8 +6,10 @@ const tokens: TyreTokens = {
   slick: [78, 84, 96, 100],
   inter: [52, 58, 70, 73],
   wet: [64, 68, 82, 86],
+  f2Wet: [54, 58, 66, 69],
   interCompound: 7,
   wetCompound: 8,
+  f2WetCompound: 15,
 };
 
 it("picks the band set by fitted compound, so slicks in the rain stay on slick bands", () => {
@@ -16,6 +18,9 @@ it("picks the band set by fitted compound, so slicks in the rain stay on slick b
   // Full wets run hotter than inters: 75 C is hot on an inter and optimal on a full wet.
   expect(band(75, bandsFor(7, tokens), TYRE_BANDS)).toBe("critical");
   expect(band(75, bandsFor(8, tokens), TYRE_BANDS)).toBe("optimal");
+  // F2 wets run cooler still: 62 C is cold on an F1 full wet and optimal on an F2 wet.
+  expect(band(62, bandsFor(8, tokens), TYRE_BANDS)).toBe("cold");
+  expect(band(62, bandsFor(15, tokens), TYRE_BANDS)).toBe("optimal");
 });
 
 it("puts a value sitting on a threshold in the band above it", () => {

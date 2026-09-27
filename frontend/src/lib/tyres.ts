@@ -16,8 +16,10 @@ export interface TyreTokens {
   slick: readonly number[];
   inter: readonly number[];
   wet: readonly number[];
+  f2Wet: readonly number[];
   interCompound: number;
   wetCompound: number;
+  f2WetCompound: number;
 }
 
 /** Read every tyre threshold once. Call at mount, never per frame: `getComputedStyle` forces a style recalc. */
@@ -28,8 +30,10 @@ export function readTyreTokens(): TyreTokens {
     slick: set(""),
     inter: set("inter-"),
     wet: set("wet-"),
+    f2Wet: set("f2-wet-"),
     interCompound: numberToken("--f1-tyre-compound-inter"),
     wetCompound: numberToken("--f1-tyre-compound-wet"),
+    f2WetCompound: numberToken("--f1-tyre-compound-f2-wet"),
   };
 }
 
@@ -37,10 +41,11 @@ export function readBrakeTokens(): readonly number[] {
   return [numberToken("--f1-brake-cold"), numberToken("--f1-brake-working"), numberToken("--f1-brake-hot")];
 }
 
-/** The carcass thresholds for a visual compound id. Anything that is not an inter or a full wet is a slick. */
+/** The carcass thresholds for a visual compound id. Anything that is not an inter or a wet is a slick. */
 export function bandsFor(compound: number | undefined, tokens: TyreTokens): readonly number[] {
   if (compound === tokens.interCompound) return tokens.inter;
   if (compound === tokens.wetCompound) return tokens.wet;
+  if (compound === tokens.f2WetCompound) return tokens.f2Wet;
   return tokens.slick;
 }
 
