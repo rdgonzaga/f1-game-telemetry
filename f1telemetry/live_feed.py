@@ -27,7 +27,15 @@ from f1telemetry.compare import LapReference
 from f1telemetry.lap_data import LapData
 from f1telemetry.live import PACKET_SLOTS, LiveState
 from f1telemetry.store import Json, SessionRecorder, best_lap_number, lap_summary
-from f1telemetry.tracker import Lap, LapCompleted, LapReopened, SessionClosed, SessionOpened, TrackerEvent
+from f1telemetry.tracker import (
+    Lap,
+    LapCompleted,
+    LapReopened,
+    SessionClosed,
+    SessionOpened,
+    SessionResumed,
+    TrackerEvent,
+)
 
 SNAPSHOT_HZ = 30
 SLOTS = tuple(PACKET_SLOTS.values())
@@ -79,7 +87,7 @@ class BestLapDelta:
     def on_event(self, event: TrackerEvent) -> None:
         if isinstance(event, SessionOpened | SessionClosed):
             self.reference, self._lap = None, None
-        elif isinstance(event, LapCompleted | LapReopened):
+        elif isinstance(event, LapCompleted | LapReopened | SessionResumed):
             self._rebuild(event.session.laps)
 
     def _rebuild(self, laps: list[Lap]) -> None:
@@ -177,7 +185,8 @@ class LiveFeed:
         self.delta.on_event(event)
         document = self.recorder.document
         message: Json
-        if isinstance(event, SessionOpened):
+        if isinstance(event, SessionOpened | SessionResumed):
+            # A resumed session is the same session open again, so the dashboard needs nothing new to show it.
             message = {"type": "session_started", "session": document}
         elif isinstance(event, LapCompleted):
             message = {"type": "lap_completed", "lap": lap_summary(event.lap), "session": document}

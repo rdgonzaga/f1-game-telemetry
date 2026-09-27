@@ -264,6 +264,60 @@ def test_live_feed_streams_snapshots_and_session_events(tmp_path: Path) -> None:
     assert telemetry.feed.clients == set()
 
 
+def feed_events(live: Any, last: Callable[[list[dict[str, Any]]], bool]) -> list[dict[str, Any]]:
+    """Session and lap messages from the live feed, skipping snapshots, until `last` says the list is complete."""
+    events: list[dict[str, Any]] = []
+    while not events or not last(events):
+        message = live.receive_json()
+        if message["type"] not in ("hello", "snapshot"):
+            events.append(message)
+    return events
+
+
+def test_save_reloads_mid_race_continue_the_same_session(tmp_path: Path) -> None:
+    # The same save loaded three times: each is SEND, then a new UID whose sessionTime is rewound to the save point.
+    packets = [data for _, data in read_records(FIXTURES / "race-2026-interlagos-reload.f1raw")]
+    last_load = 979.21
+    test_client, telemetry = client(tmp_path)
+    with test_client, test_client.websocket_connect("/ws/live") as live:
+        send(telemetry.udp_port, packets)
+        events = feed_events(live, lambda events: [m["type"] for m in events].count("lap_reopened") == 2)
+        wait_for(lambda: telemetry.state.packets_seen == len(packets))
+        lap = telemetry.tracker.lap
+
+    load = [("session_ended", None), ("session_started", None)]
+    assert [(m["type"], m["lap"]["number"] if "lap" in m else m.get("lap_number")) for m in events] == [
+        ("session_started", None),
+        ("lap_completed", 10),
+        ("lap_completed", 11),  # driven on past the save before quitting from lap 12
+        *load,
+        ("lap_reopened", 11),  # so the load goes back into it
+        *load,
+        ("lap_completed", 11),
+        *load,
+        ("lap_reopened", 11),
+    ]
+    assert len({m["session"]["id"] for m in events}) == 1
+    # The lap driven at the save keeps what came before the save point and goes on after it.
+    assert lap is not None and lap.number == 11
+    assert min(lap.samples.session_time) < last_load <= max(lap.samples.session_time)
+    [saved] = SessionStore(tmp_path).list_sessions()
+    assert [lap["number"] for lap in saved["laps"]] == [10]
+    assert saved["end_reason"] == "shutdown"
+
+
+def test_a_race_restarted_after_send_is_a_new_session(tmp_path: Path) -> None:
+    # A restart also sends SEND then a new UID on the same track, but from sessionTime 0 rather than rewound.
+    packets = [data for _, data in read_records(FIXTURES / "race-2026-jeddah-restart.f1raw")]
+    test_client, telemetry = client(tmp_path)
+    with test_client, test_client.websocket_connect("/ws/live") as live:
+        send(telemetry.udp_port, packets)
+        events = feed_events(live, lambda events: [m["type"] for m in events].count("session_started") == 2)
+
+    assert [m["type"] for m in events] == ["session_started", "session_ended", "session_started"]
+    assert events[0]["session"]["id"] != events[2]["session"]["id"]
+
+
 def test_without_a_built_frontend_the_root_explains(tmp_path: Path) -> None:
     test_client, _ = client(tmp_path, web_dir=tmp_path / "missing")
     with test_client:

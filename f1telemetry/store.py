@@ -30,6 +30,7 @@ from f1telemetry.tracker import (
     LapReopened,
     SessionClosed,
     SessionOpened,
+    SessionResumed,
     TrackedSession,
     TrackerEvent,
 )
@@ -229,6 +230,7 @@ class SessionRecorder:
         self._executor = executor or ThreadPoolExecutor(max_workers=1, thread_name_prefix="session-store")
         self._clock = clock
         self._session_id: str | None = None
+        self._closed_id: str | None = None  # the last closed session, which a loaded save resumes
         self._written = False  # whether the current session has a folder on disk yet
         # The current session's summary as last built, in the saved `session.json` shape (the live feed sends it).
         # Kept after the session closes, then holding its end.
@@ -243,6 +245,15 @@ class SessionRecorder:
             self._session_id = self._new_session_id(event.session)
             self._written = False
             self.document = session_document(self._session_id, event.session, self._started_at)
+            return
+        if isinstance(event, SessionResumed):
+            # Same folder and start time as before the SEND; the session file loses its end again.
+            session_id = self._session_id = self._closed_id
+            assert session_id is not None
+            if self._written:
+                self._save_session(event.session)
+            else:
+                self.document = session_document(session_id, event.session, self._started_at)
             return
         session_id = self._session_id
         if session_id is None:
@@ -261,6 +272,7 @@ class SessionRecorder:
                 self.document = session_document(session_id, event.session, self._started_at)
         elif isinstance(event, SessionClosed):
             self._session_id = None
+            self._closed_id = session_id
             ended_at = self._clock()
             if event.session.laps:
                 self._save_session(event.session, session_id, ended_at, event.reason)
@@ -269,6 +281,7 @@ class SessionRecorder:
                 if self._written:
                     # Its only laps were undone by flashbacks, so there is nothing left to review.
                     self._submit(_remove_dir, folder)
+                    self._written = False
 
     @property
     def active_session_id(self) -> str | None:

@@ -5,6 +5,9 @@ Rules come from real F1 25 recordings (see docs/udp-spec.md):
   events, so a UID alone isn't a session. UID 0 (menus) is ignored.
 - A session closes on SEND or a UID change. There is no idle timeout: the game sends nothing while paused, often for
   minutes, so silence doesn't mean the session is over. Call `close()` on shutdown.
+- Loading a mid-session save looks like quitting and starting again: SEND, then a new UID. It is told apart by the new
+  UID's first Session packet: same track, session type and lap count, with `sessionTime` rewound to the save point
+  but not to 0, which is where a restarted race starts. The closed session then resumes and rewinds like a flashback.
 - A lap closes when `currentLapNum` increments, or when `lastLapTimeInMS` changes without it (the chequered flag).
   The flag comes about 0.1 s before SEND, which a 20 Hz or slower send rate can miss in LapData, so a lap still open
   when the session closes takes its time from the player's SessionHistory if that lists it as finished.
@@ -162,7 +165,23 @@ class SessionClosed:
     reason: str  # "ended" (SEND), "new session" (UID change) or "shutdown"
 
 
-type TrackerEvent = SessionOpened | LapCompleted | LapReopened | SessionClosed
+@dataclass(frozen=True, slots=True)
+class SessionResumed:
+    """A save was loaded, so the session closed by the SEND before it goes on under a new UID."""
+
+    session: TrackedSession
+
+
+@dataclass(frozen=True, slots=True)
+class _Ended:
+    """A session closed by SEND, kept in case a load of a save from it follows."""
+
+    session: TrackedSession
+    lap: Lap | None  # the lap in progress at SEND, which a load may take up again
+    session_time: float  # of the SEND
+
+
+type TrackerEvent = SessionOpened | LapCompleted | LapReopened | SessionClosed | SessionResumed
 
 
 def _ignore(_: TrackerEvent) -> None:
@@ -185,6 +204,7 @@ class SessionTracker:
         self._last_lap_time_ms: int | None = None
         self._lap_data_time = 0.0  # session time of `_lap_data`
         self._history: tuple[int, ...] = ()  # the player's lap times from the latest SessionHistory
+        self._ended: _Ended | None = None
 
     def update(self, packet: Packet) -> None:
         header = packet.header
@@ -204,7 +224,10 @@ class SessionTracker:
         packet_id = header.packet_id
         if session is None:
             if packet_id == PacketId.SESSION and isinstance(data, Session):
-                self._open(uid, header.packet_format, header.player_car_index, data)
+                if self._is_load(data, header.session_time):
+                    self._resume(uid, header.session_time)
+                else:
+                    self._open(uid, header.packet_format, header.player_car_index, data)
             return
         if packet_id == PacketId.CAR_TELEMETRY:
             self._sample(header.session_time, data)  # type: ignore[arg-type]
@@ -214,7 +237,7 @@ class SessionTracker:
             if isinstance(data, Flashback):
                 self._rewind(data.session_time)
             elif isinstance(data, SessionEnded):
-                self._close("ended")
+                self._close("ended", header.session_time)
         elif packet_id == PacketId.SESSION_HISTORY:
             self._history = data.lap_times_ms  # type: ignore[attr-defined]
 
@@ -225,6 +248,7 @@ class SessionTracker:
 
     def _open(self, uid: int, packet_format: int, player_index: int, info: Session) -> None:
         self.session = TrackedSession(uid, packet_format, player_index, info)
+        self._ended = None
         self.lap = None
         self._lap_data = None
         self._closed_lap_number = None
@@ -232,17 +256,45 @@ class SessionTracker:
         self._history = ()
         self.on_event(SessionOpened(self.session))
 
-    def _close(self, reason: str) -> None:
+    def _close(self, reason: str, session_time: float | None = None) -> None:
         session = self.session
         assert session is not None
         lap = self.lap
         if lap is not None and lap.number <= len(self._history) and self._history[lap.number - 1]:
             self._complete(lap, self._history[lap.number - 1], self._lap_data_time)
+            lap = None
+        # Only SEND can come before a load; a UID change without it is a new session (a career strategy restart).
+        self._ended = _Ended(session, lap, session_time) if session_time is not None else None
         self._closed_uids.add(session.uid)
         self.session = None
         self.lap = None
         self._lap_data = None
         self.on_event(SessionClosed(session, reason))
+
+    def _is_load(self, info: Session, session_time: float) -> bool:
+        ended = self._ended
+        if ended is None:
+            return False
+        before = ended.session.info
+        return (
+            (info.track_id, info.session_type, info.total_laps)
+            == (before.track_id, before.session_type, before.total_laps)
+            # A restarted race starts again at exactly 0; a save is somewhere before the moment it was left.
+            and 0 < session_time < ended.session_time
+        )
+
+    def _resume(self, uid: int, session_time: float) -> None:
+        ended = self._ended
+        assert ended is not None
+        self._ended = None
+        session = self.session = ended.session
+        session.uid = uid
+        self.lap = ended.lap
+        self._lap_data = None
+        self._closed_lap_number = None
+        self._last_lap_time_ms = None
+        self.on_event(SessionResumed(session))
+        self._rewind(session_time)
 
     def _on_lap_data(self, session_time: float, lap_data: LapData) -> None:
         lap = self.lap
