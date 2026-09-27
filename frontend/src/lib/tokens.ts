@@ -6,3 +6,8 @@
 export function numberToken(name: `--f1-${string}`): number {
   return Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
 }
+
+/** Read a colour, font or length out of `tokens.css`. Same rule: once at mount, never per frame. */
+export function stringToken(name: `--f1-${string}`): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
