@@ -10,6 +10,7 @@ import Live from "@/routes/Live";
 const Sessions = lazy(() => import("@/routes/Sessions"));
 const LapDetail = lazy(() => import("@/routes/LapDetail"));
 const Compare = lazy(() => import("@/routes/Compare"));
+const Setup = lazy(() => import("@/routes/Setup"));
 const NotFound = lazy(() => import("@/routes/NotFound"));
 
 function Loading() {
@@ -37,6 +38,7 @@ export const router = createBrowserRouter([
       { path: "sessions", element: deferred(Sessions) },
       { path: "sessions/:sessionId/laps/:lapNumber", element: deferred(LapDetail) },
       { path: "compare", element: deferred(Compare) },
+      { path: "setup", element: deferred(Setup) },
       { path: "*", element: deferred(NotFound) },
     ],
   },
