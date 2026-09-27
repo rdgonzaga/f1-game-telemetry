@@ -41,7 +41,7 @@ recognised by size but never unpacked.
 
 | Id | Packet | 2025 | 2026 | Slot 2025 | Slot 2026 | Used |
 |---|---|---|---|---|---|---|
-| 0 | Motion | 1349 | 1325 | | | |
+| 0 | Motion | 1349 | 1325 | 60 | 54 | yes |
 | 1 | Session | 753 | 926 | — | — | yes |
 | 2 | LapData | 1285 | 1399 | 57 | 57 | yes |
 | 3 | Event | 45 | 45 | — | — | yes |
@@ -63,6 +63,9 @@ Tyre and brake arrays are always ordered **RL, RR, FL, FR**.
 
 ## What each used packet gives us
 
+- **Motion (0):** the car's world position, the first three floats of the slot (x, y height, z), in metres. Only
+  position is read. The 2026 slot size comes from the packet size; position agreeing lap to lap at the same lap
+  distance confirms the offset in both formats. See `f1telemetry/motion.py`.
 - **Session (1):** track id, session type, `formula` (series), total laps, track length, weather, temperatures, pit
   speed limit, sector 2 and 3 start distances. In 2026 it also carries active aero zones as lap fractions, DRS zones
   and assist settings. Parsed in `f1telemetry/session.py`.

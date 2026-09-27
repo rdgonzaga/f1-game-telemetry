@@ -83,7 +83,7 @@ def test_trim_keeps_parsed_packets_in_windows_and_closes_the_gaps(tmp_path: Path
         tmp_path / "source.f1raw",
         [
             (0, fake_packet(PacketId.LAP_DATA, 1)),
-            (2 * s, fake_packet(PacketId.MOTION, 2)),
+            (2 * s, fake_packet(PacketId.PARTICIPANTS, 2)),
             (2 * s + 5, fake_packet(PacketId.CAR_TELEMETRY, 3)),
             (3 * s, b"short"),
             (3 * s, fake_packet(PacketId.EVENT, 4)),

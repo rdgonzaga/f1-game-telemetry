@@ -236,6 +236,16 @@ export interface components {
             /** Engine Rpm */
             engine_rpm: number[];
             /**
+             * Ers Store Mj
+             * @description MJ; 0 for F2, which has no ERS
+             */
+            ers_store_mj?: number[] | null;
+            /**
+             * Fuel In Tank
+             * @description kg
+             */
+            fuel_in_tank?: number[] | null;
+            /**
              * Gear
              * @description -1 reverse, 0 neutral, 1-8
              */
@@ -267,6 +277,61 @@ export interface components {
              * @description 0-1
              */
             throttle: number[];
+            /**
+             * Tyre Compound
+             * @description visual compound id
+             */
+            tyre_compound?: number[] | null;
+            /**
+             * Tyre Inner Temperature Fl
+             * @description carcass, celsius
+             */
+            tyre_inner_temperature_fl?: number[] | null;
+            /**
+             * Tyre Inner Temperature Fr
+             * @description carcass, celsius
+             */
+            tyre_inner_temperature_fr?: number[] | null;
+            /**
+             * Tyre Inner Temperature Rl
+             * @description carcass, celsius
+             */
+            tyre_inner_temperature_rl?: number[] | null;
+            /**
+             * Tyre Inner Temperature Rr
+             * @description carcass, celsius
+             */
+            tyre_inner_temperature_rr?: number[] | null;
+            /**
+             * Tyre Wear Fl
+             * @description percent
+             */
+            tyre_wear_fl?: number[] | null;
+            /**
+             * Tyre Wear Fr
+             * @description percent
+             */
+            tyre_wear_fr?: number[] | null;
+            /**
+             * Tyre Wear Rl
+             * @description percent
+             */
+            tyre_wear_rl?: number[] | null;
+            /**
+             * Tyre Wear Rr
+             * @description percent
+             */
+            tyre_wear_rr?: number[] | null;
+            /**
+             * World X
+             * @description metres; with world_z, the car's place on a track map
+             */
+            world_x?: number[] | null;
+            /**
+             * World Z
+             * @description metres
+             */
+            world_z?: number[] | null;
         };
         /** LapDocument */
         LapDocument: {
@@ -284,6 +349,11 @@ export interface components {
             partial: boolean;
             /** Samples */
             samples: number;
+            /**
+             * Sector Times Ms
+             * @description sectors 1-3, 0 where not seen (joined mid-lap); absent on laps saved before version 2
+             */
+            sector_times_ms?: number[] | null;
             /** Version */
             version: number;
         };
@@ -302,6 +372,11 @@ export interface components {
             partial: boolean;
             /** Samples */
             samples: number;
+            /**
+             * Sector Times Ms
+             * @description sectors 1-3, 0 where not seen (joined mid-lap); absent on laps saved before version 2
+             */
+            sector_times_ms?: number[] | null;
         };
         /** @enum {string} */
         ListenMode: "local" | "network";

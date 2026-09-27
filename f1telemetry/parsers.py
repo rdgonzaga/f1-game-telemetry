@@ -9,12 +9,23 @@ from f1telemetry import (
     car_telemetry2,
     event,
     lap_data,
+    motion,
     session,
     session_history,
 )
 from f1telemetry.packets import PacketDispatcher
 
-PARSER_MODULES = (session, event, lap_data, car_telemetry, car_status, car_damage, car_telemetry2, session_history)
+PARSER_MODULES = (
+    session,
+    event,
+    lap_data,
+    motion,
+    car_telemetry,
+    car_status,
+    car_damage,
+    car_telemetry2,
+    session_history,
+)
 
 
 def make_dispatcher() -> PacketDispatcher:

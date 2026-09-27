@@ -48,6 +48,9 @@ class LapSummary(BaseModel):
     invalid: bool
     partial: bool = Field(description="the lap was not driven end to end, e.g. an out lap or a flashback")
     samples: int
+    sector_times_ms: list[int] | None = Field(
+        None, description="sectors 1-3, 0 where not seen (joined mid-lap); absent on laps saved before version 2"
+    )
 
 
 class SessionDocument(BaseModel):
@@ -90,6 +93,20 @@ class LapColumns(BaseModel):
     gear: list[int] = Field(description="-1 reverse, 0 neutral, 1-8")
     engine_rpm: list[int]
     drs: list[int] = Field(description="0 or 1")
+    # Added in version 2, so absent on laps saved before it. Each holds its latest packet, 0 before the first.
+    tyre_compound: list[int] | None = Field(None, description="visual compound id")
+    tyre_inner_temperature_rl: list[int] | None = Field(None, description="carcass, celsius")
+    tyre_inner_temperature_rr: list[int] | None = Field(None, description="carcass, celsius")
+    tyre_inner_temperature_fl: list[int] | None = Field(None, description="carcass, celsius")
+    tyre_inner_temperature_fr: list[int] | None = Field(None, description="carcass, celsius")
+    tyre_wear_rl: list[float] | None = Field(None, description="percent")
+    tyre_wear_rr: list[float] | None = Field(None, description="percent")
+    tyre_wear_fl: list[float] | None = Field(None, description="percent")
+    tyre_wear_fr: list[float] | None = Field(None, description="percent")
+    fuel_in_tank: list[float] | None = Field(None, description="kg")
+    ers_store_mj: list[float] | None = Field(None, description="MJ; 0 for F2, which has no ERS")
+    world_x: list[float] | None = Field(None, description="metres; with world_z, the car's place on a track map")
+    world_z: list[float] | None = Field(None, description="metres")
 
 
 class LapDocument(LapSummary):

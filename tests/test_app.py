@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import socket
 import time
 import urllib.request
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -72,6 +74,26 @@ def test_packets_reach_live_state_and_the_session_is_saved_on_shutdown(tmp_path:
     # Leaving the client runs the shutdown: tracker closed, then the recorder's writes flushed.
     [saved] = SessionStore(tmp_path).list_sessions()
     assert [(lap["number"], lap["lap_time_ms"]) for lap in saved["laps"]] == [(3, 83561)]
+
+
+def test_the_app_keeps_a_raw_recording_that_skips_menu_time(tmp_path: Path) -> None:
+    packets = [data for _, data in read_records(FIXTURES / "race-2026-monza-finish.f1raw")]
+    half = len(packets) // 2
+    telemetry = Telemetry(replace(SETTINGS, record_raw=True), tmp_path)
+    with TestClient(create_app(telemetry)):
+        assert not (tmp_path / "recordings").exists()  # nothing driven, no file
+        send(telemetry.udp_port, packets[:half])
+        wait_for(lambda: telemetry.state.packets_seen == half)
+        time.sleep(1.5)  # a trip through the menus
+        send(telemetry.udp_port, packets[half:])
+        wait_for(lambda: telemetry.state.packets_seen == len(packets))
+
+    [recording] = (tmp_path / "recordings").glob("*.f1raw")
+    records = list(read_records(recording))
+    assert [data for _, data in records] == packets
+    times = [t for t, _ in records]
+    assert times[0] == 0
+    assert max(b - a for a, b in itertools.pairwise(times)) <= 1_000_000_000
 
 
 def test_wrong_udp_format_shows_on_setup(tmp_path: Path) -> None:
@@ -335,6 +357,32 @@ def test_a_flashback_back_over_the_line_keeps_only_the_lap_driven_again(tmp_path
     ]
     assert (events[1]["lap"]["lap_time_ms"], events[3]["lap"]["lap_time_ms"]) == (126574, 126601)
     assert [(lap["number"], lap["lap_time_ms"]) for lap in events[3]["session"]["laps"]] == [(6, 126601)]
+
+
+def test_a_saved_lap_keeps_tyres_fuel_ers_position_and_sectors(tmp_path: Path) -> None:
+    packets = [data for _, data in read_records(FIXTURES / "race-2026-spa-wet-flashback.f1raw")]
+    test_client, telemetry = client(tmp_path)
+    with test_client:
+        send(telemetry.udp_port, packets)
+        wait_for(lambda: telemetry.state.packets_seen == len(packets))
+
+    store = SessionStore(tmp_path)
+    [saved] = store.list_sessions()
+    [summary] = saved["laps"]
+    # Sector times read 0 once the lap is over, so these were caught on the way round.
+    s1, s2, s3 = summary["sector_times_ms"]
+    assert min(s1, s2, s3) > 0
+    assert s1 + s2 + s3 == summary["lap_time_ms"] == 126601
+    columns = store.load_lap(saved["id"], 6)["columns"]
+    assert {len(column) for column in columns.values()} == {summary["samples"]}
+    assert set(columns["tyre_compound"]) == {7}  # inters
+    corners = ("rl", "rr", "fl", "fr")
+    assert all(40 < t < 80 for c in corners for t in columns[f"tyre_inner_temperature_{c}"])
+    assert all(0 < w < 100 for c in corners for w in columns[f"tyre_wear_{c}"])
+    assert all(0 < kg < 110 for kg in columns["fuel_in_tank"])
+    assert all(0 <= mj <= 4 for mj in columns["ers_store_mj"])
+    # Driven across the line, so the car moves on the map.
+    assert len(set(zip(columns["world_x"], columns["world_z"], strict=True))) > 1
 
 
 def test_without_a_built_frontend_the_root_explains(tmp_path: Path) -> None:

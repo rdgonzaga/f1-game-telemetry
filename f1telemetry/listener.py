@@ -1,4 +1,7 @@
-"""asyncio UDP listener that parses game packets into a `LiveState`, and a `SessionTracker` if given, on the loop."""
+"""asyncio UDP listener that parses game packets into a `LiveState`, and a `SessionTracker` if given, on the loop.
+
+A `RawSink`, if given, also gets every datagram as received.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +13,7 @@ import time
 from f1telemetry.live import LiveState
 from f1telemetry.packets import PacketDispatcher
 from f1telemetry.parsers import make_dispatcher
+from f1telemetry.recorder import RawSink
 from f1telemetry.tracker import SessionTracker
 
 log = logging.getLogger(__name__)
@@ -28,9 +32,11 @@ class TelemetryProtocol(asyncio.DatagramProtocol):
         state: LiveState,
         dispatcher: PacketDispatcher | None = None,
         tracker: SessionTracker | None = None,
+        raw: RawSink | None = None,
     ) -> None:
         self.state = state
         self.tracker = tracker
+        self.raw = raw
         # Bound once: this runs for every packet at 60 Hz.
         self._parse = (dispatcher or make_dispatcher()).parse
         self._clock = time.monotonic_ns
@@ -45,6 +51,8 @@ class TelemetryProtocol(asyncio.DatagramProtocol):
 
     def datagram_received(self, data: bytes, addr: object) -> None:
         self.state.note_datagram(self._clock())
+        if self.raw is not None:
+            self.raw.add(data)
         try:
             packet = self._parse(data)
             if packet is not None:
@@ -70,11 +78,12 @@ async def open_listener(
     port: int = DEFAULT_UDP_PORT,
     dispatcher: PacketDispatcher | None = None,
     tracker: SessionTracker | None = None,
+    raw: RawSink | None = None,
 ) -> asyncio.DatagramTransport:
     """Bind a listener on the running loop; the caller closes the returned transport."""
     loop = asyncio.get_running_loop()
     transport, _ = await loop.create_datagram_endpoint(
-        lambda: TelemetryProtocol(state, dispatcher, tracker), local_addr=(host, port)
+        lambda: TelemetryProtocol(state, dispatcher, tracker, raw), local_addr=(host, port)
     )
     sock = transport.get_extra_info("socket")
     if sock is not None:

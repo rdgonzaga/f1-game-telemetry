@@ -18,6 +18,7 @@ from f1telemetry.rawfile import RawWriter, read_records
 
 KEEP_IDS = frozenset(
     {
+        PacketId.MOTION,
         PacketId.SESSION,
         PacketId.LAP_DATA,
         PacketId.EVENT,
