@@ -318,6 +318,25 @@ def test_a_race_restarted_after_send_is_a_new_session(tmp_path: Path) -> None:
     assert events[0]["session"]["id"] != events[2]["session"]["id"]
 
 
+def test_a_flashback_back_over_the_line_keeps_only_the_lap_driven_again(tmp_path: Path) -> None:
+    # On inters in a storm: lap 6 ends at 2:06.574, a flashback goes back before the line, a second one
+    # nudges back again, and the lap is driven home 27 ms slower.
+    packets = [data for _, data in read_records(FIXTURES / "race-2026-spa-wet-flashback.f1raw")]
+    test_client, telemetry = client(tmp_path)
+    with test_client, test_client.websocket_connect("/ws/live") as live:
+        send(telemetry.udp_port, packets)
+        events = feed_events(live, lambda events: [m["type"] for m in events].count("lap_completed") == 2)
+
+    assert [(m["type"], m["lap"]["number"] if "lap" in m else m.get("lap_number")) for m in events] == [
+        ("session_started", None),
+        ("lap_completed", 6),
+        ("lap_reopened", 6),
+        ("lap_completed", 6),
+    ]
+    assert (events[1]["lap"]["lap_time_ms"], events[3]["lap"]["lap_time_ms"]) == (126574, 126601)
+    assert [(lap["number"], lap["lap_time_ms"]) for lap in events[3]["session"]["laps"]] == [(6, 126601)]
+
+
 def test_without_a_built_frontend_the_root_explains(tmp_path: Path) -> None:
     test_client, _ = client(tmp_path, web_dir=tmp_path / "missing")
     with test_client:
