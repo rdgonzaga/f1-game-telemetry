@@ -99,6 +99,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change Settings */
+        post: operations["change_settings_api_settings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/setup": {
         parameters: {
             query?: never;
@@ -767,6 +784,36 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** SettingsChange */
+        SettingsChange: {
+            listen_mode?: components["schemas"]["ListenMode"] | null;
+            /** Udp Port */
+            udp_port?: number | null;
+        };
+        /** SettingsResult */
+        SettingsResult: {
+            /** Applied */
+            applied: boolean;
+            /** Connected */
+            connected: boolean;
+            /** Error */
+            error: string | null;
+            /** Lan Addresses */
+            lan_addresses: string[];
+            listen_mode: components["schemas"]["ListenMode"];
+            /** Packet Errors */
+            packet_errors: number;
+            /** Packet Format */
+            packet_format: number | null;
+            /** Packet Warning */
+            packet_warning: string | null;
+            /** Restart Required */
+            restart_required: boolean;
+            /** Udp Host */
+            udp_host: string;
+            /** Udp Port */
+            udp_port: number;
+        };
         /** SetupInfo */
         SetupInfo: {
             /** Connected */
@@ -1032,6 +1079,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_settings_api_settings_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResult"];
                 };
             };
             /** @description Validation Error */

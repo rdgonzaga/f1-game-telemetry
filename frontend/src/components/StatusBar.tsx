@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useRef } from "react";
 
-import { ApiError, api } from "@/api/client";
-import type { SetupInfo } from "@/api/types";
-import { useLiveSession, useLiveStatus, useStaleSeconds } from "@/live/useLive";
+import { FORMULA_F2 } from "@/api/types";
+import { useSetup, useSetupPoll } from "@/live/setup";
+import { useLiveFrame, useLiveSession, useLiveStatus, useStaleSeconds } from "@/live/useLive";
 
 /**
  * The four states of the dashboard, along the bottom.
@@ -11,13 +11,21 @@ import { useLiveSession, useLiveStatus, useStaleSeconds } from "@/live/useLive";
  * so the bar carries the port to type into the game. Paused means it was sending and stopped, so it
  * counts the silence instead; the panels keep their last values, dimmed. See `docs/design.md`.
  *
- * #53 builds the full first-run setup screen. This is the bar only.
+ * The packet format and rate change with every snapshot, so they are written through refs, not rendered.
  */
 export function StatusBar() {
   const status = useLiveStatus();
   const session = useLiveSession();
   const stale = useStaleSeconds();
-  const setup = useSetupInfo(status === "offline" || status === "waiting");
+  useSetupPoll(status === "offline" || status === "waiting" ? POLL_MS : null);
+  const setup = useSetup();
+  const format = useRef<HTMLSpanElement>(null);
+  const rate = useRef<HTMLSpanElement>(null);
+
+  useLiveFrame((snapshot) => {
+    if (format.current) format.current.textContent = snapshot.packet_format?.toString() ?? "—";
+    if (rate.current) rate.current.textContent = snapshot.connected ? String(snapshot.packets_per_second) : "0";
+  });
 
   return (
     <footer className="flex h-[var(--f1-statusbar-h)] shrink-0 items-center gap-3 border-t border-border bg-surface-sunken px-3 text-xs tracking-[var(--f1-tracking-label)] uppercase">
@@ -49,8 +57,26 @@ export function StatusBar() {
               {session.laps.length}
               {session.total_laps > 0 && ` / ${session.total_laps}`} laps
             </span>
+            <span className="text-text-2">{session.formula.id === FORMULA_F2 ? "F2" : "F1"}</span>
           </>
         )}
+        {status !== "offline" && (
+          <>
+            <span className="tnum text-text-3">
+              format{" "}
+              <span ref={format} className="text-text-2">
+                —
+              </span>
+            </span>
+            <span className="tnum text-text-3">
+              <span ref={rate} className="text-text-2">
+                0
+              </span>{" "}
+              pkt/s
+            </span>
+          </>
+        )}
+        {setup && <span className="tnum text-text-3">UDP {setup.udp_port}</span>}
       </span>
     </footer>
   );
@@ -73,38 +99,5 @@ function Dot({ status }: { status: ReturnType<typeof useLiveStatus> }) {
   return <span className={`size-2 rounded-full ${colour}`} aria-hidden />;
 }
 
-/**
- * `/api/setup`, polled only while it could still tell us something.
- *
- * Once packets are flowing the port is not news, and the live socket already reports everything that
- * changes, so polling then would be a request every two seconds for nothing.
- */
+/** How often `/api/setup` is asked while the game has not been heard from. */
 const POLL_MS = 2000;
-
-function useSetupInfo(wanted: boolean): SetupInfo | null {
-  const [setup, setSetup] = useState<SetupInfo | null>(null);
-
-  useEffect(() => {
-    if (!wanted) return;
-    const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout>;
-
-    const poll = async () => {
-      try {
-        setSetup(await api.setup(controller.signal));
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        if (error instanceof ApiError || error instanceof TypeError) setSetup(null);
-      }
-      if (!controller.signal.aborted) timer = setTimeout(() => void poll(), POLL_MS);
-    };
-
-    void poll();
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
-  }, [wanted]);
-
-  return setup;
-}

@@ -1,4 +1,4 @@
-import { Activity, GitCompareArrows, ListOrdered } from "lucide-react";
+import { Activity, GitCompareArrows, ListOrdered, Plug } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
 import { StatusBar } from "@/components/StatusBar";
@@ -8,6 +8,7 @@ const LINKS = [
   { to: "/", label: "Live", icon: Activity, end: true },
   { to: "/sessions", label: "Sessions", icon: ListOrdered, end: false },
   { to: "/compare", label: "Compare", icon: GitCompareArrows, end: false },
+  { to: "/setup", label: "Setup", icon: Plug, end: false },
 ];
 
 /**

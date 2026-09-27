@@ -36,6 +36,12 @@ class TelemetryProtocol(asyncio.DatagramProtocol):
         self._clock = time.monotonic_ns
         self._warned = False
         self.errors = 0  # packets whose handling raised
+        # Set once the socket is really closed; `transport.close()` only schedules it, and a rebind to the same
+        # port must wait for it.
+        self.closed = asyncio.Event()
+
+    def connection_lost(self, exc: Exception | None) -> None:
+        self.closed.set()
 
     def datagram_received(self, data: bytes, addr: object) -> None:
         self.state.note_datagram(self._clock())

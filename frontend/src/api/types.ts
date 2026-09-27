@@ -9,6 +9,8 @@ import type { components } from "./schema";
 type Schemas = components["schemas"];
 
 export type SetupInfo = Schemas["SetupInfo"];
+export type SettingsChange = Schemas["SettingsChange"];
+export type SettingsResult = Schemas["SettingsResult"];
 export type SessionSummary = Schemas["SessionSummary"];
 export type SessionDocument = Schemas["SessionDocument"];
 export type LapSummary = Schemas["LapSummary"];

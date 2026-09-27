@@ -8,7 +8,7 @@
  * The live feed is a WebSocket and is not fetched here; #22 owns it. `liveSocketUrl` is the one thing it needs
  * from this module, so the two halves cannot disagree about where the backend is.
  */
-import type { CompareResult, LapDocument, SessionSummary, SetupInfo } from "./types";
+import type { CompareResult, LapDocument, SessionSummary, SettingsChange, SettingsResult, SetupInfo } from "./types";
 
 const DEV_API_PORT = 20778;
 
@@ -32,7 +32,11 @@ export class ApiError extends Error {
 }
 
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(`${apiBase}${path}`, { signal });
+  return requestJson<T>(path, { signal });
+}
+
+async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
+  const response = await fetch(`${apiBase}${path}`, init);
   if (!response.ok) {
     // FastAPI puts the reason in `detail`; a proxy or a dead backend will not, so fall back to the status.
     const detail = await response
@@ -48,6 +52,14 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
 
 export const api = {
   setup: (signal?: AbortSignal) => getJson<SetupInfo>("/api/setup", signal),
+
+  /** Saves and rebinds the UDP listener. A failed rebind is not an error: it comes back with `applied: false`. */
+  saveSettings: (change: SettingsChange) =>
+    requestJson<SettingsResult>("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(change),
+    }),
 
   sessions: (signal?: AbortSignal) => getJson<SessionSummary[]>("/api/sessions", signal),
 

@@ -84,6 +84,65 @@ def test_wrong_udp_format_shows_on_setup(tmp_path: Path) -> None:
     assert "2024" in warning and "2025 or 2026" in warning
 
 
+def free_udp_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        return int(probe.getsockname()[1])
+
+
+def test_changing_the_port_rebinds_live_without_splitting_the_session(tmp_path: Path) -> None:
+    packets = [data for _, data in read_records(FIXTURES / "race-2026-monza-finish.f1raw")]
+    half = len(packets) // 2
+    (tmp_path / "settings.json").write_text('{"http_port": 20900}', encoding="utf-8")
+    test_client, telemetry = client(tmp_path)
+    with test_client:
+        old_port = telemetry.udp_port
+        send(old_port, packets[:half])
+        wait_for(lambda: telemetry.state.packets_seen == half)
+
+        new_port = free_udp_port()
+        reply = test_client.post("/api/settings", json={"udp_port": new_port}).json()
+        assert (reply["applied"], reply["restart_required"], reply["udp_port"]) == (True, False, new_port)
+
+        send(old_port, packets[half:])  # nothing listens there any more
+        send(new_port, packets[half:])
+        wait_for(lambda: telemetry.state.packets_seen == len(packets))
+
+    # Other keys in the file survive the write.
+    assert json.loads((tmp_path / "settings.json").read_text(encoding="utf-8")) == {
+        "http_port": 20900,
+        "udp_port": new_port,
+    }
+    [saved] = SessionStore(tmp_path).list_sessions()
+    assert [lap["number"] for lap in saved["laps"]] == [3]
+
+
+def test_a_port_that_cant_be_bound_keeps_the_old_listener_and_asks_for_a_restart(tmp_path: Path) -> None:
+    test_client, telemetry = client(tmp_path)
+    with test_client, socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as squatter:
+        squatter.bind(("127.0.0.1", 0))
+        taken = squatter.getsockname()[1]
+        old_port = telemetry.udp_port
+
+        reply = test_client.post("/api/settings", json={"udp_port": taken}).json()
+        assert (reply["applied"], reply["restart_required"], reply["udp_port"]) == (False, True, old_port)
+        assert reply["error"]
+
+        send(old_port, [(2024).to_bytes(2, "little") + bytes(40)])
+        wait_for(lambda: telemetry.state.packets_seen == 1)
+
+    # Saved anyway, so the restart it asks for picks the port up.
+    assert json.loads((tmp_path / "settings.json").read_text(encoding="utf-8")) == {"udp_port": taken}
+
+
+@pytest.mark.parametrize("body", [{"listen_mode": "everywhere"}, {"udp_port": 70000}, {"http_host": "0.0.0.0"}])
+def test_bad_settings_are_refused(tmp_path: Path, body: dict[str, Any]) -> None:
+    test_client, _ = client(tmp_path)
+    with test_client:
+        assert test_client.post("/api/settings", json=body).status_code == 422
+    assert not (tmp_path / "settings.json").exists()
+
+
 def test_open_session_is_closed_when_the_app_stops(tmp_path: Path) -> None:
     records = list(read_records(FIXTURES / "race-2026-monza-finish.f1raw"))
     # Everything before the flag, so a lap is still in progress when the app stops.
