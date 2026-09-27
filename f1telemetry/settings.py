@@ -34,6 +34,8 @@ class Settings:
     # The dashboard stays on this PC unless `http_host` is changed on purpose: it can delete sessions.
     http_host: str = LOCAL_HOST
     http_port: int = 20778
+    # Also keep every packet in `<data dir>/recordings/`, for replaying later. About 1-2.5 GB per hour driven.
+    record_raw: bool = False
 
     @property
     def udp_host(self) -> str:
@@ -46,6 +48,8 @@ def _valid(name: str, value: Any) -> bool:
     if name in ("udp_port", "http_port"):
         # Port 0 asks the OS for a free port, which tests and the desktop app use.
         return isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 65535
+    if name == "record_raw":
+        return isinstance(value, bool)
     return isinstance(value, str) and bool(value)
 
 

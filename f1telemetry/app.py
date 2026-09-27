@@ -31,6 +31,7 @@ from f1telemetry.listener import TelemetryProtocol, open_listener
 from f1telemetry.live import LiveState
 from f1telemetry.live_feed import FeedClient, LiveFeed
 from f1telemetry.parsers import make_dispatcher
+from f1telemetry.recorder import RawSink
 from f1telemetry.schemas import CompareResult, ErrorDetail, LapDocument, SessionSummary
 from f1telemetry.settings import ListenMode, Settings, lan_ipv4_addresses, save_settings
 from f1telemetry.store import Json, SessionRecorder, SessionStore
@@ -45,7 +46,7 @@ DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 
 class Telemetry:
-    """The UDP side: listener, live state, session tracker, recorder and live feed. The app's lifespan runs it."""
+    """The UDP side: listener, live state, session tracker, recorders and live feed. The app's lifespan runs it."""
 
     def __init__(self, settings: Settings, data_dir: Path) -> None:
         self.settings = settings
@@ -56,6 +57,7 @@ class Telemetry:
         self.feed = LiveFeed(self.state, self.recorder)
         self.tracker = SessionTracker(self._on_tracker_event)
         self.dispatcher = make_dispatcher()
+        self.raw = RawSink(data_dir / "recordings") if settings.record_raw else None
         self.protocol: TelemetryProtocol | None = None
         self.udp_port = settings.udp_port  # the bound port once started; differs when settings ask for port 0
         self._transport: asyncio.DatagramTransport | None = None
@@ -82,7 +84,7 @@ class Telemetry:
 
     async def _listen(self, settings: Settings) -> None:
         transport = await open_listener(
-            self.state, settings.udp_host, settings.udp_port, self.dispatcher, tracker=self.tracker
+            self.state, settings.udp_host, settings.udp_port, self.dispatcher, tracker=self.tracker, raw=self.raw
         )
         self._transport = transport
         protocol = transport.get_protocol()
@@ -142,6 +144,8 @@ class Telemetry:
                 await self._feed_task
             self._feed_task = None
         await asyncio.to_thread(self.recorder.close)
+        if self.raw is not None:
+            await asyncio.to_thread(self.raw.close)
 
 
 class SetupInfo(BaseModel):

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import socket
 import time
 import urllib.request
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -72,6 +74,26 @@ def test_packets_reach_live_state_and_the_session_is_saved_on_shutdown(tmp_path:
     # Leaving the client runs the shutdown: tracker closed, then the recorder's writes flushed.
     [saved] = SessionStore(tmp_path).list_sessions()
     assert [(lap["number"], lap["lap_time_ms"]) for lap in saved["laps"]] == [(3, 83561)]
+
+
+def test_the_app_keeps_a_raw_recording_that_skips_menu_time(tmp_path: Path) -> None:
+    packets = [data for _, data in read_records(FIXTURES / "race-2026-monza-finish.f1raw")]
+    half = len(packets) // 2
+    telemetry = Telemetry(replace(SETTINGS, record_raw=True), tmp_path)
+    with TestClient(create_app(telemetry)):
+        assert not (tmp_path / "recordings").exists()  # nothing driven, no file
+        send(telemetry.udp_port, packets[:half])
+        wait_for(lambda: telemetry.state.packets_seen == half)
+        time.sleep(1.5)  # a trip through the menus
+        send(telemetry.udp_port, packets[half:])
+        wait_for(lambda: telemetry.state.packets_seen == len(packets))
+
+    [recording] = (tmp_path / "recordings").glob("*.f1raw")
+    records = list(read_records(recording))
+    assert [data for _, data in records] == packets
+    times = [t for t, _ in records]
+    assert times[0] == 0
+    assert max(b - a for a, b in itertools.pairwise(times)) <= 1_000_000_000
 
 
 def test_wrong_udp_format_shows_on_setup(tmp_path: Path) -> None:

@@ -25,7 +25,7 @@ CI (`.github/workflows/ci.yml`) runs every command above and skips a side whose 
 Run the app (UDP listener, session tracking and saving, API) and open the dashboard:
 
 ```sh
-uv run f1telemetry                    # --no-browser, --network for PS5/Xbox, --data-dir, --udp-port, --port
+uv run f1telemetry                    # --no-browser, --network for PS5/Xbox, --record, --data-dir, --udp-port, --port
 ```
 
 Sessions and `settings.json` live in `%LOCALAPPDATA%\F1Telemetry` (Windows) or `~/.local/share/f1telemetry`.

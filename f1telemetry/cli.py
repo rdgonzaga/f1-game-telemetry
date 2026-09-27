@@ -53,6 +53,13 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--host", dest="http_host", help=f"dashboard address (default {LOCAL_HOST})")
     serve.add_argument("--port", dest="http_port", type=int, help="dashboard port (default 20778)")
     serve.add_argument("--no-browser", action="store_true", help="don't open the dashboard in a browser")
+    serve.add_argument(
+        "--record",
+        dest="record_raw",
+        action="store_const",
+        const=True,
+        help="also keep every packet in <data dir>/recordings, for replaying later",
+    )
 
     record = commands.add_parser("record", help="record raw game packets to an .f1raw file")
     record.add_argument("--out", type=Path, help="output file (default recordings/<timestamp>.f1raw)")
@@ -99,6 +106,7 @@ def run_serve(args: argparse.Namespace) -> None:
             udp_port=args.udp_port,
             http_host=args.http_host,
             http_port=args.http_port,
+            record_raw=args.record_raw,
         )
     except ValueError as error:
         sys.exit(f"f1telemetry: {error}")
