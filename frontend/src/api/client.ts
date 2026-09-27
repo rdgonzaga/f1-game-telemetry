@@ -36,6 +36,10 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
 }
 
 async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
+  return (await (await request(path, init)).json()) as T;
+}
+
+async function request(path: string, init: RequestInit): Promise<Response> {
   const response = await fetch(`${apiBase}${path}`, init);
   if (!response.ok) {
     // FastAPI puts the reason in `detail`; a proxy or a dead backend will not, so fall back to the status.
@@ -47,7 +51,7 @@ async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
       .catch(() => null);
     throw new ApiError(response.status, detail ?? `${response.status} ${response.statusText}`);
   }
-  return (await response.json()) as T;
+  return response;
 }
 
 export const api = {
@@ -65,6 +69,11 @@ export const api = {
 
   session: (sessionId: string, signal?: AbortSignal) =>
     getJson<SessionSummary>(`/api/sessions/${encodeURIComponent(sessionId)}`, signal),
+
+  /** 409 while the session is still being recorded. Answers 204 with no body, so nothing is parsed. */
+  deleteSession: async (sessionId: string): Promise<void> => {
+    await request(`/api/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
+  },
 
   lap: (sessionId: string, number: number, signal?: AbortSignal) =>
     getJson<LapDocument>(`/api/sessions/${encodeURIComponent(sessionId)}/laps/${number}`, signal),
