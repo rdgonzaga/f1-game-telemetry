@@ -1,7 +1,8 @@
 """The app server: FastAPI on the same asyncio loop as the UDP listener, session tracker, recorder and live feed.
 
 Endpoints: `/ws/live` (see `live_feed`), `/api/sessions` to list, load and delete saved sessions and laps,
-`/api/compare` to put two laps side by side (see `compare`), and `/api/setup` for the connection screen.
+`/api/compare` to put two laps side by side (see `compare`), and `/api/setup` + `/api/settings` for the connection
+screen.
 
 `create_app` builds the app and `make_server` wraps it in a uvicorn server. The CLI runs that server on the main
 thread; `ServerThread` runs it on a background thread and stops it from code, which the desktop window app needs.
@@ -16,13 +17,14 @@ import threading
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from f1telemetry.compare import compare_laps
 from f1telemetry.listener import TelemetryProtocol, open_listener
@@ -30,7 +32,7 @@ from f1telemetry.live import LiveState
 from f1telemetry.live_feed import FeedClient, LiveFeed
 from f1telemetry.parsers import make_dispatcher
 from f1telemetry.schemas import CompareResult, ErrorDetail, LapDocument, SessionSummary
-from f1telemetry.settings import ListenMode, Settings, lan_ipv4_addresses
+from f1telemetry.settings import ListenMode, Settings, lan_ipv4_addresses, save_settings
 from f1telemetry.store import Json, SessionRecorder, SessionStore
 from f1telemetry.tracker import SessionTracker, TrackerEvent
 
@@ -47,6 +49,7 @@ class Telemetry:
 
     def __init__(self, settings: Settings, data_dir: Path) -> None:
         self.settings = settings
+        self.data_dir = data_dir
         self.state = LiveState()
         self.store = SessionStore(data_dir)
         self.recorder = SessionRecorder(self.store)
@@ -57,6 +60,7 @@ class Telemetry:
         self.udp_port = settings.udp_port  # the bound port once started; differs when settings ask for port 0
         self._transport: asyncio.DatagramTransport | None = None
         self._feed_task: asyncio.Task[None] | None = None
+        self._changing = asyncio.Lock()  # two changes at once would interleave closing and reopening
 
     def _on_tracker_event(self, event: TrackerEvent) -> None:
         # Recorder first: the feed sends the session summary the recorder just built.
@@ -64,32 +68,73 @@ class Telemetry:
         self.feed.on_event(event)
 
     async def start(self) -> None:
-        host = self.settings.udp_host
         try:
-            transport = await open_listener(
-                self.state, host, self.settings.udp_port, self.dispatcher, tracker=self.tracker
-            )
+            await self._listen(self.settings)
         except OSError as error:
             log.error(
                 "Can't listen for game packets on UDP %s:%d (%s). Is another telemetry app using that port?",
-                host,
+                self.settings.udp_host,
                 self.settings.udp_port,
                 error,
             )
             raise
+        self._feed_task = asyncio.create_task(self.feed.run(), name="live-feed")
+
+    async def _listen(self, settings: Settings) -> None:
+        transport = await open_listener(
+            self.state, settings.udp_host, settings.udp_port, self.dispatcher, tracker=self.tracker
+        )
         self._transport = transport
         protocol = transport.get_protocol()
         assert isinstance(protocol, TelemetryProtocol)
         self.protocol = protocol
         self.udp_port = transport.get_extra_info("sockname")[1]
-        log.info("Listening for game telemetry on UDP %s:%d", host, self.udp_port)
-        self._feed_task = asyncio.create_task(self.feed.run(), name="live-feed")
+        log.info("Listening for game telemetry on UDP %s:%d", settings.udp_host, self.udp_port)
+
+    async def _close_listener(self) -> None:
+        if self._transport is None:
+            return
+        self._transport.close()
+        self._transport = None
+        if self.protocol is not None:
+            await self.protocol.closed.wait()
+
+    async def change(self, listen_mode: ListenMode | None, udp_port: int | None) -> str | None:
+        """Save the new UDP settings and listen with them now; on failure keep the old listener and say why.
+
+        Live state and the session tracker carry over, so a session in progress goes on across the switch.
+        """
+        async with self._changing:
+            return await self._change(listen_mode, udp_port)
+
+    async def _change(self, listen_mode: ListenMode | None, udp_port: int | None) -> str | None:
+        wanted = replace(
+            self.settings,
+            listen_mode=listen_mode or self.settings.listen_mode,
+            udp_port=self.settings.udp_port if udp_port is None else udp_port,
+        )
+        given: dict[str, object] = {"listen_mode": listen_mode, "udp_port": udp_port}
+        changes = {name: value for name, value in given.items() if value is not None}
+        await asyncio.to_thread(save_settings, self.data_dir, changes)
+        # The port actually bound, not the one asked for, which may be 0.
+        old = replace(self.settings, udp_port=self.udp_port)
+        # Close first: the same port on a wider host collides with the old socket on some systems.
+        await self._close_listener()
+        try:
+            await self._listen(wanted)
+        except OSError as error:
+            log.warning(
+                "Can't listen on UDP %s:%d (%s), keeping the old settings", wanted.udp_host, wanted.udp_port, error
+            )
+            # The port was ours a moment ago. If even this fails, the error reaches the caller: nothing is listening.
+            await self._listen(old)
+            return str(error)
+        self.settings = wanted
+        return None
 
     async def stop(self) -> None:
         """Stop listening, then close the open session before the recorder so its final write isn't lost."""
-        if self._transport is not None:
-            self._transport.close()
-            self._transport = None
+        await self._close_listener()
         self.tracker.close()
         if self._feed_task is not None:
             self._feed_task.cancel()
@@ -110,6 +155,19 @@ class SetupInfo(BaseModel):
     packet_errors: int
 
 
+class SettingsChange(BaseModel):
+    # Only the UDP side: the dashboard can delete sessions, so its address is never changed from the dashboard.
+    model_config = ConfigDict(extra="forbid")
+    listen_mode: ListenMode | None = None
+    udp_port: int | None = Field(default=None, ge=0, le=65535)
+
+
+class SettingsResult(SetupInfo):
+    applied: bool
+    restart_required: bool  # saved, but not listening with it; the next start picks it up
+    error: str | None
+
+
 def create_app(telemetry: Telemetry, web_dir: Path = WEB_DIR) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -126,8 +184,7 @@ def create_app(telemetry: Telemetry, web_dir: Path = WEB_DIR) -> FastAPI:
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    @app.get("/api/setup")
-    async def setup() -> SetupInfo:
+    async def setup_info() -> SetupInfo:
         state = telemetry.state
         protocol = telemetry.protocol
         return SetupInfo(
@@ -140,6 +197,18 @@ def create_app(telemetry: Telemetry, web_dir: Path = WEB_DIR) -> FastAPI:
             packet_format=state.packet_format,
             packet_warning=telemetry.dispatcher.last_warning,
             packet_errors=protocol.errors if protocol is not None else 0,
+        )
+
+    @app.get("/api/setup")
+    async def setup() -> SetupInfo:
+        return await setup_info()
+
+    @app.post("/api/settings")
+    async def change_settings(change: SettingsChange) -> SettingsResult:
+        error = await telemetry.change(change.listen_mode, change.udp_port)
+        info = await setup_info()
+        return SettingsResult(
+            **info.model_dump(), applied=error is None, restart_required=error is not None, error=error
         )
 
     _add_sessions(app, telemetry)

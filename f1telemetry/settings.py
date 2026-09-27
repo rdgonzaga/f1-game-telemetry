@@ -73,6 +73,22 @@ def load_settings(data_dir: Path) -> Settings:
     return Settings(**values)
 
 
+def save_settings(data_dir: Path, changes: dict[str, Any]) -> None:
+    """Write `changes` into settings.json, keeping every other key already there. Blocking: call it off the loop."""
+    path = data_dir / SETTINGS_FILE
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raw = {}
+    if not isinstance(raw, dict):
+        raw = {}
+    raw.update(changes)
+    data_dir.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(path.name + ".tmp")
+    temp.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+    temp.replace(path)
+
+
 def with_overrides(settings: Settings, **overrides: Any) -> Settings:
     """Apply command-line values; None means the flag wasn't given."""
     given = {name: value for name, value in overrides.items() if value is not None}
