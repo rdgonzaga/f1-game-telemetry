@@ -103,6 +103,15 @@ committed fixtures in `tests/fixtures/` pin the ones the parsers can show.
   Skipped career sessions get a UID of their own that only ever carries events (speed traps, retirements), so a
   session needs its Session packet before it counts. `f1telemetry/tracker.py` opens a session on that packet and
   closes it on `SEND` or a UID change.
+- **Loading a mid-session save looks like quitting and starting a new session**: `SEND`, a few UID 0 packets, then
+  `SSTA` and a Session packet under a new `sessionUID`, `frameIdentifier` 0. What gives it away is `sessionTime`:
+  it resumes at the save point, below the `SEND`'s, while track, session type and total laps carry on. A race
+  restarted after `SEND` shares all of that except the time, which starts at exactly 0.00. Measured: a Brazil race
+  loaded the same save three times (`SEND` at 1024.96, 985.76 and 1041.04, then new UIDs at 985.76, 979.89 and
+  979.21, all on lap 11); two career race restarts after `SEND` started at 0.00 on lap 1. The tracker keeps the
+  session closed by `SEND` and resumes it when the next Session packet matches, then rewinds to the load's
+  `sessionTime` the same way it undoes a flashback. Fixtures: `race-2026-interlagos-reload`,
+  `race-2026-jeddah-restart`.
 - **The game sends nothing while paused**, for as long as the pause lasts (gaps of six minutes in one career race).
   Silence doesn't mean the session is over, so the tracker has no idle timeout.
 - Time Trial freezes tyre temperatures, engine temperature, fuel, ERS store and tyre wear, so those fields need a

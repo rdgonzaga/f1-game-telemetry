@@ -12,7 +12,7 @@ from f1telemetry.packets import HEADER, PACKET_ID_OFFSET, PacketId
 from f1telemetry.rawfile import RawWriter, read_records
 from f1telemetry.recorder import record
 from f1telemetry.replayer import replay
-from trim_raw import trim
+from trim_raw import WINDOW_GAP_NS, trim
 
 PACKETS = [(0, b"\x01" * 29), (5_000_000, b"\x02" * 1448), (40_000_000, b"\x03" * 269)]
 
@@ -77,7 +77,7 @@ def fake_packet(packet_id: int, tag: int) -> bytes:
     return bytes(data)
 
 
-def test_trim_keeps_parsed_packets_in_window_and_rebases_time(tmp_path: Path) -> None:
+def test_trim_keeps_parsed_packets_in_windows_and_closes_the_gaps(tmp_path: Path) -> None:
     s = 1_000_000_000
     source = write_file(
         tmp_path / "source.f1raw",
@@ -88,11 +88,14 @@ def test_trim_keeps_parsed_packets_in_window_and_rebases_time(tmp_path: Path) ->
             (3 * s, b"short"),
             (3 * s, fake_packet(PacketId.EVENT, 4)),
             (4 * s, fake_packet(PacketId.SESSION, 5)),
+            (60 * s, fake_packet(PacketId.LAP_DATA, 6)),
         ],
     )
     out = tmp_path / "nested" / "out.f1raw"
-    assert trim(source, out, 1.5, 3.0) == 2
+    assert trim(source, out, [(1.5, 3.0), (59.0, 61.0)]) == 3
+    # The minute between the windows shrinks to WINDOW_GAP_NS, so a replay doesn't sit through it.
     assert list(read_records(out)) == [
         (0, fake_packet(PacketId.CAR_TELEMETRY, 3)),
         (s - 5, fake_packet(PacketId.EVENT, 4)),
+        (s - 5 + WINDOW_GAP_NS, fake_packet(PacketId.LAP_DATA, 6)),
     ]

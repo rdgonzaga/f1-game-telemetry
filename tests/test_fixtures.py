@@ -28,12 +28,14 @@ from f1telemetry.session_history import SessionHistory
 FIXTURES = Path(__file__).parent / "fixtures"
 MAX_FIXTURE_BYTES = 300_000
 
-# name: (packet format, player car index)
+# name: (packet format, player car index, session UIDs)
 EXPECTED = {
-    "race-2025-melbourne-lap": (2025, 19),
-    "tt-2026-monza-flashback": (2026, 0),
-    "race-2026-monza-finish": (2026, 21),
-    "f2-2026-sakhir-pit": (2026, 21),
+    "race-2025-melbourne-lap": (2025, 19, 1),
+    "tt-2026-monza-flashback": (2026, 0, 1),
+    "race-2026-monza-finish": (2026, 21, 1),
+    "f2-2026-sakhir-pit": (2026, 21, 1),
+    "race-2026-interlagos-reload": (2026, 21, 4),  # a new UID for each of three loads
+    "race-2026-jeddah-restart": (2026, 6, 2),
 }
 
 
@@ -53,7 +55,7 @@ def of_type[T](packets: list[tuple[int, Packet]], kind: type[T]) -> list[T]:
 
 @pytest.mark.parametrize("name", EXPECTED)
 def test_fixture_decodes_fully(name: str) -> None:
-    packet_format, player = EXPECTED[name]
+    packet_format, player, uids = EXPECTED[name]
     path = FIXTURES / f"{name}.f1raw"
     assert path.stat().st_size < MAX_FIXTURE_BYTES
 
@@ -65,7 +67,7 @@ def test_fixture_decodes_fully(name: str) -> None:
     assert {h.packet_format for h in headers} == {packet_format}
     assert {h.player_car_index for h in headers} == {player}
     # UID 0 only on the SessionHistory the game sends just before SEND.
-    assert len({h.session_uid for h in headers} - {0}) == 1
+    assert len({h.session_uid for h in headers} - {0}) == uids
     for kind in (Session, LapData, CarTelemetry, CarStatus, CarDamage):
         assert of_type(packets, kind), f"no {kind.__name__} packets"
     assert bool(of_type(packets, CarTelemetry2)) == (packet_format == 2026)
