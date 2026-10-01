@@ -10,6 +10,7 @@ from f1telemetry.car_damage import CarDamage
 from f1telemetry.car_status import CarStatus
 from f1telemetry.car_telemetry import CarTelemetry
 from f1telemetry.car_telemetry2 import CarTelemetry2
+from f1telemetry.event import SAFETY_CAR_RESUME_RACE, RedFlag, SafetyCar
 from f1telemetry.lap_data import LapData
 from f1telemetry.packets import Packet, PacketId
 from f1telemetry.session import Session
@@ -17,6 +18,9 @@ from f1telemetry.session import Session
 NS_PER_SECOND = 1_000_000_000
 # ~60 packets a second are expected at the game's default rate, so a second of silence means paused or stopped.
 CONNECTED_TIMEOUT_NS = NS_PER_SECOND
+
+# Session `safety_car_status` -> race state. A red flag isn't in the Session packet; only its event says so.
+RACE_STATES = {0: "green", 1: "safety_car", 2: "virtual_safety_car", 3: "formation_lap"}
 
 # Packet id -> attribute holding its latest payload. Events are not stored; session and lap tracking consumes them.
 PACKET_SLOTS: dict[int, str] = {
@@ -40,6 +44,7 @@ class LiveState:
         "packets_per_second",
         "packets_seen",
         "player_index",
+        "red_flag",
         "session",
         "session_uid",
         "status",
@@ -66,6 +71,7 @@ class LiveState:
         self.status: CarStatus | None = None
         self.damage: CarDamage | None = None
         self.telemetry2: CarTelemetry2 | None = None
+        self.red_flag = False
 
     def note_datagram(self, now_ns: int) -> None:
         """Record that a datagram arrived, parsed or not, so connection status tracks the socket and not the parsers."""
@@ -92,11 +98,29 @@ class LiveState:
             self.clear_packets()
         self.packet_format = header.packet_format
         self.player_index = header.player_car_index
-        if packet.data is None:
+        data = packet.data
+        if data is None:
             return
         slot = PACKET_SLOTS.get(header.packet_id)
         if slot is not None:
-            setattr(self, slot, packet.data)
+            setattr(self, slot, data)
+        elif isinstance(data, RedFlag):
+            self.red_flag = True
+        elif isinstance(data, SafetyCar) and data.event_type == SAFETY_CAR_RESUME_RACE:
+            self.red_flag = False
+
+    def race_state(self) -> str | None:
+        """Green, safety car, VSC, formation lap or red flag; None before the first Session packet.
+
+        The Session packet keeps reporting the safety car under a red flag, so the flag takes precedence until the
+        safety car event that resumes the race.
+        """
+        if self.red_flag:
+            return "red_flag"
+        session = self.session
+        if session is None:
+            return None
+        return RACE_STATES.get(session.safety_car_status, "green")
 
     def connected(self, now_ns: int) -> bool:
         """True while a datagram arrived within the last second."""

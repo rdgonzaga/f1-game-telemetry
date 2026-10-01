@@ -557,6 +557,8 @@ export interface components {
             is_spectating: boolean;
             /** Pit Speed Limit */
             pit_speed_limit: number;
+            /** Safety Car Status */
+            safety_car_status: number;
             /** Sector2 Lap Distance Start */
             sector2_lap_distance_start: number;
             /** Sector3 Lap Distance Start */
@@ -617,6 +619,11 @@ export interface components {
             packets_per_second: number;
             /** Player Index */
             player_index: number | null;
+            /**
+             * Race State
+             * @description null before the first Session packet; a red flag outranks the safety car
+             */
+            race_state: ("green" | "safety_car" | "virtual_safety_car" | "formation_lap" | "red_flag") | null;
             session: components["schemas"]["LiveSession"] | null;
             status: components["schemas"]["LiveStatus"] | null;
             telemetry: components["schemas"]["LiveTelemetry"] | null;
