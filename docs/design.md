@@ -171,6 +171,13 @@ and desaturated, under a yellow "no packets for Ns" badge.
 Zeroing them would be a lie, and hiding them throws away the one thing you want after the game drops
 out mid-lap: what it was doing when it stopped.
 
+### Safety car and red flag
+
+A chip in the status bar, filled like the paused badge: `--f1-flag-yellow` for the safety car and VSC,
+`--f1-flag-red` for a red flag, with `--f1-text-on-fill` on both. Green and the formation lap show
+nothing, since that is the normal state. A red flag outranks the safety car the game keeps reporting
+under it (see `docs/udp-spec.md`).
+
 ### Numbers the game has not filled in yet
 
 The first `Session` packet of a session reports **track 0 C and air 0 C**, and only the next one

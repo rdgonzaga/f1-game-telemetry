@@ -12,6 +12,7 @@ import { useLiveFrame, useLiveSession, useLiveStatus, useStaleSeconds } from "@/
  * counts the silence instead; the panels keep their last values, dimmed. See `docs/design.md`.
  *
  * The packet format and rate change with every snapshot, so they are written through refs, not rendered.
+ * So is the race state chip, shown only under a safety car, VSC or red flag.
  */
 export function StatusBar() {
   const status = useLiveStatus();
@@ -21,10 +22,17 @@ export function StatusBar() {
   const setup = useSetup();
   const format = useRef<HTMLSpanElement>(null);
   const rate = useRef<HTMLSpanElement>(null);
+  const race = useRef<HTMLSpanElement>(null);
 
   useLiveFrame((snapshot) => {
     if (format.current) format.current.textContent = snapshot.packet_format?.toString() ?? "—";
     if (rate.current) rate.current.textContent = snapshot.connected ? String(snapshot.packets_per_second) : "0";
+    const chip = race.current;
+    const tone = (snapshot.race_state && RACE_CHIP[snapshot.race_state]) ? snapshot.race_state : "none";
+    if (chip && chip.dataset.tone !== tone) {
+      chip.dataset.tone = tone;
+      chip.textContent = RACE_CHIP[tone] ?? "";
+    }
   });
 
   return (
@@ -37,6 +45,12 @@ export function StatusBar() {
           no packets for {stale}s
         </span>
       )}
+
+      <span
+        ref={race}
+        data-tone="none"
+        className="rounded-sm px-2 py-0.5 font-semibold text-text-on-fill data-[tone=none]:hidden data-[tone=red_flag]:bg-[var(--f1-flag-red)] data-[tone=safety_car]:bg-[var(--f1-flag-yellow)] data-[tone=virtual_safety_car]:bg-[var(--f1-flag-yellow)]"
+      />
 
       {status === "waiting" && setup && (
         <span className="tnum text-text-3">
@@ -81,6 +95,13 @@ export function StatusBar() {
     </footer>
   );
 }
+
+/** Race states that get a chip; green and the formation lap show nothing. */
+const RACE_CHIP: Partial<Record<string, string>> = {
+  safety_car: "Safety car",
+  virtual_safety_car: "VSC",
+  red_flag: "Red flag",
+};
 
 const LABEL: Record<ReturnType<typeof useLiveStatus>, string> = {
   offline: "Backend offline",

@@ -10,6 +10,7 @@ function snapshot(over: Partial<LiveSnapshot> = {}): LiveSnapshot {
     packet_format: null,
     player_index: null,
     packets_per_second: 0,
+    race_state: null,
     session: null,
     lap: null,
     telemetry: null,
