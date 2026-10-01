@@ -17,6 +17,7 @@ from f1telemetry.tracker import (
     LapReopened,
     SessionClosed,
     SessionOpened,
+    SessionResumed,
     SessionTracker,
     TrackerEvent,
 )
@@ -330,3 +331,22 @@ def test_flashback_forgets_session_history_it_may_have_undone() -> None:
     game.tracker.close()
 
     assert game.of_type(LapCompleted) == []
+
+
+def test_a_save_from_another_race_on_the_same_lap_is_a_new_session() -> None:
+    """Same track, type, lap count and a rewound sessionTime, but the car is elsewhere on the lap: not this race."""
+    packets = fixture_packets("race-2026-interlagos-reload")
+    first_load = next(
+        packet.header.session_uid for packet in packets if packet.header.session_time == 985.7553100585938
+    )
+    events: list[TrackerEvent] = []
+    tracker = SessionTracker(events.append)
+    for packet in packets:
+        data = packet.data
+        if packet.header.session_uid == first_load and isinstance(data, LapData):
+            packet = packet._replace(data=data._replace(lap_distance=data.lap_distance - 2000))
+        tracker.update(packet)
+
+    assert not [event for event in events if isinstance(event, SessionResumed | LapReopened)]
+    first = next(event.session for event in events if isinstance(event, SessionOpened))
+    assert [lap.number for lap in first.laps] == [10, 11]

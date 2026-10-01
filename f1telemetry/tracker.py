@@ -5,9 +5,11 @@ Rules come from real F1 25 recordings (see docs/udp-spec.md):
   events, so a UID alone isn't a session. UID 0 (menus) is ignored.
 - A session closes on SEND or a UID change. There is no idle timeout: the game sends nothing while paused, often for
   minutes, so silence doesn't mean the session is over. Call `close()` on shutdown.
-- Loading a mid-session save looks like quitting and starting again: SEND, then a new UID. It is told apart by the new
-  UID's first Session packet: same track, session type and lap count, with `sessionTime` rewound to the save point
-  but not to 0, which is where a restarted race starts. The closed session then resumes and rewinds like a flashback.
+- Loading a mid-session save looks like quitting and starting again: SEND, then a new UID. The new UID's first
+  Session packet makes it a candidate: same track, session type and lap count, with `sessionTime` rewound to the save
+  point but not to 0, which is where a restarted race starts. Its first LapData decides: a load puts the car on the
+  lap and at the distance driven at that `sessionTime`, which a save from another race would not. The closed session
+  then resumes and rewinds like a flashback.
 - A lap closes when `currentLapNum` increments, or when `lastLapTimeInMS` changes without it (the chequered flag).
   The flag comes about 0.1 s before SEND, which a 20 Hz or slower send rate can miss in LapData, so a lap still open
   when the session closes takes its time from the player's SessionHistory if that lists it as finished.
@@ -45,6 +47,8 @@ DRIVER_OUT_LAP = 3
 PARTIAL_LAP_SHARE = 0.5
 # The lap timer jitters back a few ms now and then; a Time Trial restart takes it back to about zero.
 LAP_RESTART_DROP_MS = 1000
+# A loaded save puts the car within 0.2 m of where it was driven at that sessionTime (three Brazil loads).
+LOAD_DISTANCE_TOLERANCE_M = 10.0
 
 
 @dataclass(slots=True)
@@ -192,6 +196,17 @@ class _Ended:
     session_time: float  # of the SEND
 
 
+@dataclass(frozen=True, slots=True)
+class _Pending:
+    """A new UID whose Session packet looks like a load of the ended session; its first LapData decides."""
+
+    uid: int
+    packet_format: int
+    player_index: int
+    info: Session
+    session_time: float
+
+
 type TrackerEvent = SessionOpened | LapCompleted | LapReopened | SessionClosed | SessionResumed
 
 
@@ -220,6 +235,7 @@ class SessionTracker:
         self._damage: CarDamage | None = None
         self._motion: Motion | None = None
         self._ended: _Ended | None = None
+        self._pending: _Pending | None = None
 
     def update(self, packet: Packet) -> None:
         header = packet.header
@@ -238,12 +254,24 @@ class SessionTracker:
             return
         packet_id = header.packet_id
         if session is None:
-            if packet_id == PacketId.SESSION and isinstance(data, Session):
+            pending = self._pending
+            if pending is not None and pending.uid == uid:
+                if packet_id != PacketId.LAP_DATA:
+                    return
+                if self._matches_save(data, pending.session_time):  # type: ignore[arg-type]
+                    self._resume(uid, pending.session_time)
+                else:
+                    self._open(uid, pending.packet_format, pending.player_index, pending.info)
+            elif packet_id == PacketId.SESSION and isinstance(data, Session):
                 if self._is_load(data, header.session_time):
-                    self._resume(uid, header.session_time)
+                    self._pending = _Pending(
+                        uid, header.packet_format, header.player_car_index, data, header.session_time
+                    )
                 else:
                     self._open(uid, header.packet_format, header.player_car_index, data)
-            return
+                return
+            else:
+                return
         if packet_id == PacketId.CAR_TELEMETRY:
             self._sample(header.session_time, data)  # type: ignore[arg-type]
         elif packet_id == PacketId.LAP_DATA:
@@ -270,6 +298,7 @@ class SessionTracker:
     def _open(self, uid: int, packet_format: int, player_index: int, info: Session) -> None:
         self.session = TrackedSession(uid, packet_format, player_index, info)
         self._ended = None
+        self._pending = None
         self.lap = None
         self._lap_data = None
         self._closed_lap_number = None
@@ -304,10 +333,29 @@ class SessionTracker:
             and 0 < session_time < ended.session_time
         )
 
+    def _matches_save(self, lap_data: LapData, session_time: float) -> bool:
+        """True when the car is on the lap, and between the distances, driven either side of `session_time`."""
+        ended = self._ended
+        assert ended is not None
+        laps = ended.session.laps if ended.lap is None else [*ended.session.laps, ended.lap]
+        lap = next((lap for lap in reversed(laps) if lap.start_session_time <= session_time), None)
+        if lap is None or lap.number != lap_data.current_lap_num:
+            return False
+        if lap.end_session_time and session_time > lap.end_session_time:
+            return False  # the gap after a lap closed at the flag
+        times = lap.samples.session_time
+        distances = lap.samples.lap_distance
+        i = bisect_left(times, session_time)
+        distance = lap_data.lap_distance
+        if i > 0 and distance < distances[i - 1] - LOAD_DISTANCE_TOLERANCE_M:
+            return False
+        return i == len(times) or distance <= distances[i] + LOAD_DISTANCE_TOLERANCE_M
+
     def _resume(self, uid: int, session_time: float) -> None:
         ended = self._ended
         assert ended is not None
         self._ended = None
+        self._pending = None
         session = self.session = ended.session
         session.uid = uid
         self.lap = ended.lap
