@@ -6,6 +6,7 @@ import type { SessionSummary } from "@/api/types";
 import { useApi } from "@/api/useApi";
 import { Panel } from "@/components/Panel";
 import { DeleteSession } from "@/components/sessions/DeleteSession";
+import { Button } from "@/components/ui/button";
 import { SESSION_KINDS, formatStarted, sessionKind, type SessionKind } from "@/lib/laps";
 import { formatLapTime } from "@/lib/timing";
 import { cn } from "@/lib/utils";
@@ -61,7 +62,12 @@ export default function Sessions() {
           {shown.map((session) => (
             <li key={session.id} className="flex items-center gap-3">
               <SessionRow session={session} />
-              {session.status !== "recording" && (
+              {session.status === "recording" ? (
+                // Holds the button's width, so the row being recorded lines up with the rest.
+                <Button variant="outline" className="invisible" tabIndex={-1} aria-hidden>
+                  Delete
+                </Button>
+              ) : (
                 <DeleteSession
                   sessionId={session.id}
                   onDeleted={() => setDeleted((ids) => new Set(ids).add(session.id))}
