@@ -42,7 +42,7 @@ export function StatusBar() {
 
       {status === "paused" && (
         <span className="tnum rounded-sm bg-warn px-2 py-0.5 font-semibold text-text-on-fill normal-case">
-          no packets for {stale}s
+          {stale === null ? "no packets" : `no packets for ${stale}s`}
         </span>
       )}
 
