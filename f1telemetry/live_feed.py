@@ -6,9 +6,11 @@ others or UDP intake. Events queue and are never skipped.
 
 Messages are JSON objects with a `type`:
 - `hello`: on connect, with the open `session` or null.
-- `snapshot`: `connected`, `packet_format`, `player_index`, `packets_per_second`, then the latest packet of each
-  kind (`session`, `lap`, `telemetry`, `status`, `damage`, `telemetry2`) as an object, or null until one arrives,
-  and `delta` (`best_lap` and `seconds` against the session's best lap), null until there is one to compare with.
+- `snapshot`: `connected`, `packet_format`, `player_index`, `packets_per_second`, `race_state` (`green`,
+  `safety_car`, `virtual_safety_car`, `formation_lap`, `red_flag`, or null before a Session packet), then the latest
+  packet of each kind (`session`, `lap`, `telemetry`, `status`, `damage`, `telemetry2`) as an object, or null until
+  one arrives, and `delta` (`best_lap` and `seconds` against the session's best lap), null until there is one
+  to compare with.
 - `session_started`, `lap_completed` (with `lap`), `lap_reopened` (with `lap_number`), `session_ended` (with
   `reason`): each carries the whole `session` summary in the saved `session.json` shape, so a client just replaces
   what it holds.
@@ -64,6 +66,7 @@ def snapshot(state: LiveState, connected: bool, delta: Json | None = None) -> Js
         "player_index": state.player_index,
         "packets_per_second": state.packets_per_second,
     }
+    message["race_state"] = state.race_state()
     for slot in SLOTS:
         message[slot] = _fields(getattr(state, slot))
     message["delta"] = delta

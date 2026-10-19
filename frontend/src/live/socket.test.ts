@@ -36,7 +36,7 @@ function build() {
   });
 }
 
-const connected = { type: "snapshot", connected: true, packet_format: 2026, player_index: 21, packets_per_second: 60, session: null, lap: null, telemetry: null, status: null, damage: null, telemetry2: null, delta: null };
+const connected = { type: "snapshot", connected: true, packet_format: 2026, player_index: 21, packets_per_second: 60, race_state: null, session: null, lap: null, telemetry: null, status: null, damage: null, telemetry2: null, delta: null };
 
 beforeEach(() => {
   vi.useFakeTimers();

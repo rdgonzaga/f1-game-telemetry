@@ -67,12 +67,12 @@ Tyre and brake arrays are always ordered **RL, RR, FL, FR**.
   position is read. The 2026 slot size comes from the packet size; position agreeing lap to lap at the same lap
   distance confirms the offset in both formats. See `f1telemetry/motion.py`.
 - **Session (1):** track id, session type, `formula` (series), total laps, track length, weather, temperatures, pit
-  speed limit, sector 2 and 3 start distances. In 2026 it also carries active aero zones as lap fractions, DRS zones
+  speed limit, safety car status, sector 2 and 3 start distances. In 2026 it also carries active aero zones as lap fractions, DRS zones
   and assist settings. Parsed in `f1telemetry/session.py`.
 - **LapData (2):** last and current lap time, sector times, lap and total distance, position, lap number, pit status,
   driver status, the lap-invalid flag, penalties and warnings. Sector times and deltas arrive split into a
   millisecond part and a minutes part, which the parser recombines. See `f1telemetry/lap_data.py`.
-- **Event (3):** a 4-character code at byte 29 with an optional payload. Used: `SSTA`, `SEND`, `FTLP`, `FLBK`.
+- **Event (3):** a 4-character code at byte 29 with an optional payload. Used: `SSTA`, `SEND`, `FTLP`, `FLBK`, `SCAR`, `RDFL`.
   See `f1telemetry/event.py`.
 - **CarTelemetry (6):** speed, throttle, brake, steer, clutch, gear, RPM, DRS, rev lights, brake and tyre
   temperatures, tyre pressures. See `f1telemetry/car_telemetry.py`.
@@ -111,10 +111,20 @@ committed fixtures in `tests/fixtures/` pin the ones the parsers can show.
   it resumes at the save point, below the `SEND`'s, while track, session type and total laps carry on. A race
   restarted after `SEND` shares all of that except the time, which starts at exactly 0.00. Measured: a Brazil race
   loaded the same save three times (`SEND` at 1024.96, 985.76 and 1041.04, then new UIDs at 985.76, 979.89 and
-  979.21, all on lap 11); two career race restarts after `SEND` started at 0.00 on lap 1. The tracker keeps the
-  session closed by `SEND` and resumes it when the next Session packet matches, then rewinds to the load's
-  `sessionTime` the same way it undoes a flashback. Fixtures: `race-2026-interlagos-reload`,
+  979.21, all on lap 11); two career race restarts after `SEND` started at 0.00 on lap 1. Each load's first LapData
+  put the car within 0.2 m of where it was driven at that `sessionTime`, on the same lap. The tracker keeps the
+  session closed by `SEND`, holds a new UID whose Session packet matches, and resumes only if its first LapData
+  agrees on lap and distance (10 m tolerance), so a save from another race of the same length opens a new session
+  instead of rewinding this one. It then rewinds to the load's `sessionTime` the same way it undoes a flashback. Fixtures: `race-2026-interlagos-reload`,
   `race-2026-jeddah-restart`.
+- **Safety car and red flag:** the Session packet's `safetyCarStatus` (0 none, 1 full, 2 virtual, 3 formation lap)
+  is the race state, about a second behind the `SCAR` event (Spa: `SCAR` deployed at 14.08, status 1 from 15.20;
+  formation laps read 3). There is no red flag status: `RDFL` came at 14.34, 0.3 s after the safety car, and the
+  status kept reading 1 through it. `SCAR` with event type 3 (resume race) came at 24.39, then nothing until
+  `sessionTime` 1824 as the stoppage was skipped. So `LiveState` takes the safety car from the Session packet and
+  holds a red flag from `RDFL` until that `SCAR`. A second safety car later ran deployed, returning (2229.70),
+  returned (2266.52) and resume race (2278.61), with the status back to 0 at 2279.84. Fixture:
+  `race-2026-spa-red-flag`.
 - **The game sends nothing while paused**, for as long as the pause lasts (gaps of six minutes in one career race).
   Silence doesn't mean the session is over, so the tracker has no idle timeout.
 - Time Trial freezes tyre temperatures, engine temperature, fuel, ERS store and tyre wear, so those fields need a

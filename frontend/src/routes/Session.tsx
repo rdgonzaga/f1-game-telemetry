@@ -40,7 +40,7 @@ export default function Session() {
           <Link to="/sessions" className="text-sm text-text-3 hover:text-text-2 hover:underline">
             Sessions
           </Link>
-          <h1 className="truncate text-2xl font-extrabold tracking-[var(--f1-tracking-display)] text-text-1">
+          <h1 className="truncate text-2xl font-black tracking-[var(--f1-tracking-display)] text-text-1 uppercase">
             {data.track.name}
           </h1>
           <p className="text-sm text-text-3">

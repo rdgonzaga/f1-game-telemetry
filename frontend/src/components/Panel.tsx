@@ -28,7 +28,9 @@ export function Panel({
       )}
     >
       <header className="flex h-[var(--f1-header-h)] shrink-0 items-center justify-between gap-3 border-b border-border-soft bg-surface-sunken px-[var(--f1-space-4)]">
-        <h2 className="text-xs font-semibold tracking-[var(--f1-tracking-label)] text-text-3 uppercase">{title}</h2>
+        <h2 className="flex items-center gap-2 text-sm font-bold tracking-[0.06em] text-text-1 uppercase before:h-3.5 before:w-1 before:bg-brand">
+          {title}
+        </h2>
         {aside}
       </header>
       <div className="min-h-0 flex-1 p-[var(--f1-panel-pad)]">{children}</div>

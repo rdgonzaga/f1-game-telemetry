@@ -13,17 +13,19 @@ Three earlier passes were rejected, and the reasons are the design:
 - **Nothing leads.** A wall of equal-weight numbers in three grey rails. Every screen now has one
   thing that is obviously the headline and a clear second tier beneath it.
 - **No containers.** Hairline dividers on a flat black ground were not enough separation. Every
-  section is now a real card: its own surface, a 1px border, an 8px radius and a header strip, with
+  section is now a real card: its own surface, a 1px border, square corners and a header strip with a red tick, with
   the border and fill both lifting on hover.
 - **Too grey, too small.** Secondary text was `#8a8a93` at 15px with 10px labels. Base is now 16px,
-  the secondary ramp is `#c7c7d2` / `#9295a3`, and 11px is reserved for uppercase micro-labels and
+  the secondary ramp is `#b8b8c4` / `#9295a3`, and 11px is reserved for uppercase micro-labels and
   axis numerals that always sit next to a large value.
 
 ## Colour
 
-The greys and the red are Formula 1's own, taken off formula1.com. The timing colours are the sport's
-broadcast language. Both choices are the point: they are real to the subject instead of being a
-generic dark theme with a red accent bolted on.
+The surfaces, lines, text and red are shared with the f1-prediction site, so the two read as one
+product: near-black ground, a black top bar over a 3px red rule, a skewed red mark, uppercase nav and
+headings, a red tick before each section title. The one exception is `--f1-text-3`: the site uses
+`#7d7d8b`, which is darker than the grey already rejected here as too grey, so it stays `#9295a3`.
+The timing colours are the sport's broadcast language and are not ours to reinterpret.
 
 ### Timing owns purple, green and yellow
 
@@ -31,7 +33,7 @@ Purple session best, green personal best, yellow slower than your own best. A dr
 faster than any label, and they are not ours to reinterpret.
 
 Broadcast purple is `#b14fdb`, which measures 3.85:1 against `--f1-surface-2` and fails AA for the
-small text it actually carries, a lap time in a table. The token is lightened to `#bc63e5` (4.65:1),
+small text it actually carries, a lap time in a table. The token is lightened to `#bc63e5` (4.82:1),
 close enough to read as the same colour.
 
 ### Delta loss is yellow, not red
@@ -42,7 +44,7 @@ reinforce each other rather than compete: green is good in both, yellow is cauti
 
 ### Red is scarce, and it cannot carry small text
 
-`--f1-accent` (`#e10600`) measures **3.25:1** at worst against the surfaces it sits on. That is legal
+`--f1-accent` (`#e10600`) measures **3.37:1** at worst against the surfaces it sits on. That is legal
 for marks, fills, rules and large text (24px+, or 19px bold) and **illegal for anything at body
 size**. A red label, a red unit, a red table cell are all wrong. When something red has to be read
 small, use `--f1-critical` (`#ff4747`, 4.8:1).
@@ -55,13 +57,13 @@ AA for normal text, 4.5:1, measured against all three surfaces and taking the wo
 
 | Token | Worst ratio | Verdict |
 |---|---|---|
-| `--f1-text-1` | 16.1:1 | pass |
-| `--f1-text-2` | 9.6:1 | pass |
-| `--f1-text-3` | 5.4:1 | pass |
+| `--f1-text-1` | 15.2:1 | pass |
+| `--f1-text-2` | 8.5:1 | pass |
+| `--f1-text-3` | 5.6:1 | pass |
 | every state colour | 4.6:1+ | pass |
-| `--f1-accent` | 3.25:1 | marks and large text only |
-| `--f1-text-disabled` | 3.1:1 | disabled controls only |
-| `--f1-border-control` | 3.36:1 | clears the 3:1 non-text floor |
+| `--f1-accent` | 3.37:1 | marks and large text only |
+| `--f1-text-disabled` | 3.3:1 | disabled controls only |
+| `--f1-border-control` | 3.48:1 | clears the 3:1 non-text floor |
 
 `--f1-border` and `--f1-border-soft` sit below 3:1 deliberately. They are decorative separators and
 never carry meaning alone. Anything that is the boundary of a control uses `--f1-border-control`.
@@ -71,13 +73,12 @@ eyeball it.
 
 ## Type
 
-**Saira carries words. Iosevka carries figures.** Never at the same size directly adjacent — a 44px
+**Titillium Web carries words. JetBrains Mono carries figures.** The same pair as the f1-prediction
+site. Never at the same size directly adjacent — a 44px
 lap time beside a 44px circuit name is what made an earlier pass look like one badly-rendered font
 rather than a pair. Size or weight always separates them.
 
-The pairing works because Saira is squarish and wide where Iosevka is narrow. An earlier attempt used
-Barlow Semi Condensed, and two narrow faces read as a single inconsistent one. Saira at weight 800 is
-also the closest available match to F1's own chunky uppercase headings.
+Headings are Titillium Web Black (900), uppercase.
 
 Both are self-hosted. The app runs on localhost and must work with no internet; a Google Fonts link
 falls back to Consolas offline.
@@ -170,6 +171,13 @@ and desaturated, under a yellow "no packets for Ns" badge.
 
 Zeroing them would be a lie, and hiding them throws away the one thing you want after the game drops
 out mid-lap: what it was doing when it stopped.
+
+### Safety car and red flag
+
+A chip in the status bar, filled like the paused badge: `--f1-flag-yellow` for the safety car and VSC,
+`--f1-flag-red` for a red flag, with `--f1-text-on-fill` on both. Green and the formation lap show
+nothing, since that is the normal state. A red flag outranks the safety car the game keeps reporting
+under it (see `docs/udp-spec.md`).
 
 ### Numbers the game has not filled in yet
 

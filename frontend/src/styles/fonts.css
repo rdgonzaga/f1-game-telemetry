@@ -4,49 +4,66 @@
  * falls back to Consolas and the dashboard stops looking like itself.
  *
  * These @font-face rules are written out rather than importing Fontsource's own stylesheets, because those also
- * declare a `.woff` source for browsers that predate 2016. Iosevka's latin subset is ~1 MB per weight, so those
- * fallbacks alone were 3.8 MB of the build. The app opens in a current browser, and woff2 is all it needs.
+ * declare a `.woff` source for browsers that predate 2016. The app opens in a current browser, and woff2 is all
+ * it needs.
  *
- * Only the weights docs/design.md uses are here. Saira: 400 body, 600 values and labels, 800 hero headings.
- * Iosevka: 400 figures, 600 the live values that lead a panel.
+ * The same two faces as the f1-prediction site. Only the weights docs/design.md uses are here. Titillium Web:
+ * 400 body, 600 values and labels, 700 nav and section titles, 900 headings. JetBrains Mono: 400 figures, 600
+ * the live values that lead a panel, 700 positions.
  */
 
 @font-face {
-  font-family: "Saira";
+  font-family: "Titillium Web";
   font-style: normal;
   font-weight: 400;
   font-display: block;
-  src: url("@fontsource/saira/files/saira-latin-400-normal.woff2") format("woff2");
+  src: url("@fontsource/titillium-web/files/titillium-web-latin-400-normal.woff2") format("woff2");
 }
 
 @font-face {
-  font-family: "Saira";
+  font-family: "Titillium Web";
   font-style: normal;
   font-weight: 600;
   font-display: block;
-  src: url("@fontsource/saira/files/saira-latin-600-normal.woff2") format("woff2");
+  src: url("@fontsource/titillium-web/files/titillium-web-latin-600-normal.woff2") format("woff2");
 }
 
 @font-face {
-  font-family: "Saira";
+  font-family: "Titillium Web";
   font-style: normal;
-  font-weight: 800;
+  font-weight: 700;
   font-display: block;
-  src: url("@fontsource/saira/files/saira-latin-800-normal.woff2") format("woff2");
+  src: url("@fontsource/titillium-web/files/titillium-web-latin-700-normal.woff2") format("woff2");
 }
 
 @font-face {
-  font-family: "Iosevka";
+  font-family: "Titillium Web";
+  font-style: normal;
+  font-weight: 900;
+  font-display: block;
+  src: url("@fontsource/titillium-web/files/titillium-web-latin-900-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
   font-style: normal;
   font-weight: 400;
   font-display: block;
-  src: url("@fontsource/iosevka/files/iosevka-latin-400-normal.woff2") format("woff2");
+  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2") format("woff2");
 }
 
 @font-face {
-  font-family: "Iosevka";
+  font-family: "JetBrains Mono";
   font-style: normal;
   font-weight: 600;
   font-display: block;
-  src: url("@fontsource/iosevka/files/iosevka-latin-600-normal.woff2") format("woff2");
+  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-600-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-700-normal.woff2") format("woff2");
 }

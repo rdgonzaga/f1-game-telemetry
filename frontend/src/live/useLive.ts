@@ -30,9 +30,14 @@ export function useLastLap(): LiveState["lastLap"] {
   return useStore(liveStore, (state) => state.lastLap);
 }
 
-/** Whole seconds since the last packet, for the paused badge. Changes about once a second. */
-export function useStaleSeconds(): number {
-  return useStore(liveStore, (state) => state.staleSeconds);
+/**
+ * Whole seconds since the last packet, for the paused badge. Changes about once a second.
+ *
+ * Null when this page never saw a packet arrive (it opened with the game already paused), so there is nothing to
+ * count from.
+ */
+export function useStaleSeconds(): number | null {
+  return useStore(liveStore, (state) => (state.lastPacketAt === null ? null : state.staleSeconds));
 }
 
 /**
