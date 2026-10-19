@@ -31,6 +31,12 @@ updates:
     groups:
       frontend:
         patterns: ["*"]
+    ignore:
+      # openapi-typescript peers on typescript 5, and CI runs Node 22.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: build
       include: scope
