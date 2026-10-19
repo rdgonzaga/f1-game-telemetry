@@ -12,6 +12,8 @@ from typing import NamedTuple
 from f1telemetry.packets import FORMATS, HEADER, PacketDispatcher, PacketHeader, PacketId
 
 SESSION_INFO = struct.Struct("<BbbBHBbBHHB??")
+# After spectatorCarIndex, sliProNativeSupport, numMarshalZones and 21 five-byte marshal zones.
+SAFETY_CAR_STATUS_OFFSET = HEADER.size + SESSION_INFO.size + 3 + 21 * 5
 SECTOR_STARTS = struct.Struct("<ff")
 # Sector starts are the last field of the 2025 packet; 2026 appends active aero data after them.
 AERO_STATUS_OFFSET = FORMATS[2025].packet_sizes[PacketId.SESSION]
@@ -41,6 +43,7 @@ class Session(NamedTuple):
     pit_speed_limit: int
     game_paused: bool
     is_spectating: bool
+    safety_car_status: int  # 0 none, 1 full, 2 virtual, 3 formation lap
     sector2_lap_distance_start: float
     sector3_lap_distance_start: float
     # Format 2026 only; None / empty in 2025. Zone bounds are fractions of the lap.
@@ -93,6 +96,7 @@ def parse_session(header: PacketHeader, data: bytes) -> Session:
         pit_speed_limit,
         game_paused,
         is_spectating,
+        data[SAFETY_CAR_STATUS_OFFSET],
         sector2,
         sector3,
         status,

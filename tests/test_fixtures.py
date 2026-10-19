@@ -37,6 +37,7 @@ EXPECTED = {
     "race-2026-interlagos-reload": (2026, 21, 4),  # a new UID for each of three loads
     "race-2026-jeddah-restart": (2026, 6, 2),
     "race-2026-spa-wet-flashback": (2026, 21, 1),
+    "race-2026-spa-red-flag": (2026, 21, 1),
 }
 
 

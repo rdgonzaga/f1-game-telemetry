@@ -195,6 +195,10 @@ LiveSnapshot: type[BaseModel] = create_model(
     packet_format=(int | None, ...),
     player_index=(int | None, ...),
     packets_per_second=(float, ...),
+    race_state=(
+        Literal["green", "safety_car", "virtual_safety_car", "formation_lap", "red_flag"] | None,
+        Field(description="null before the first Session packet; a red flag outranks the safety car"),
+    ),
     session=(LiveSession | None, ...),
     lap=(LiveLap | None, ...),
     telemetry=(LiveTelemetry | None, ...),

@@ -13,6 +13,7 @@ function snapshot(speed: number, connected = true): LiveSnapshot {
     packet_format: 2026,
     player_index: 21,
     packets_per_second: 60,
+    race_state: null,
     session: null,
     lap: null,
     telemetry: { speed } as never,

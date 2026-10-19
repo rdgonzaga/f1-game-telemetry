@@ -12,6 +12,7 @@ import { useLiveFrame, useLiveSession, useLiveStatus, useStaleSeconds } from "@/
  * counts the silence instead; the panels keep their last values, dimmed. See `docs/design.md`.
  *
  * The packet format and rate change with every snapshot, so they are written through refs, not rendered.
+ * So is the race state chip, shown only under a safety car, VSC or red flag.
  */
 export function StatusBar() {
   const status = useLiveStatus();
@@ -21,10 +22,17 @@ export function StatusBar() {
   const setup = useSetup();
   const format = useRef<HTMLSpanElement>(null);
   const rate = useRef<HTMLSpanElement>(null);
+  const race = useRef<HTMLSpanElement>(null);
 
   useLiveFrame((snapshot) => {
     if (format.current) format.current.textContent = snapshot.packet_format?.toString() ?? "—";
     if (rate.current) rate.current.textContent = snapshot.connected ? String(snapshot.packets_per_second) : "0";
+    const chip = race.current;
+    const shown = snapshot.race_state ? RACE_CHIP[snapshot.race_state] : undefined;
+    if (chip && chip.textContent !== (shown?.label ?? "")) {
+      chip.dataset.tone = shown?.flag ?? "none";
+      chip.textContent = shown?.label ?? "";
+    }
   });
 
   return (
@@ -34,9 +42,15 @@ export function StatusBar() {
 
       {status === "paused" && (
         <span className="tnum rounded-sm bg-warn px-2 py-0.5 font-semibold text-text-on-fill normal-case">
-          no packets for {stale}s
+          {stale === null ? "no packets" : `no packets for ${stale}s`}
         </span>
       )}
+
+      <span
+        ref={race}
+        data-tone="none"
+        className="rounded-sm px-2 py-0.5 font-semibold text-text-on-fill data-[tone=none]:hidden data-[tone=red]:bg-[var(--f1-flag-red)] data-[tone=yellow]:bg-[var(--f1-flag-yellow)]"
+      />
 
       {status === "waiting" && setup && (
         <span className="tnum text-text-3">
@@ -81,6 +95,18 @@ export function StatusBar() {
     </footer>
   );
 }
+
+/**
+ * Race states that get a chip; green and the formation lap show nothing.
+ *
+ * The tone is the flag colour, not the state: Tailwind reads `_` in `data-[tone=red_flag]` as a space, so a
+ * selector on the state names never matched and the chip had no background.
+ */
+const RACE_CHIP: Partial<Record<string, { label: string; flag: "yellow" | "red" }>> = {
+  safety_car: { label: "Safety car", flag: "yellow" },
+  virtual_safety_car: { label: "VSC", flag: "yellow" },
+  red_flag: { label: "Red flag", flag: "red" },
+};
 
 const LABEL: Record<ReturnType<typeof useLiveStatus>, string> = {
   offline: "Backend offline",

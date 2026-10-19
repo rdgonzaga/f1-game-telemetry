@@ -545,3 +545,34 @@ def test_comparing_something_that_is_not_there_is_404(tmp_path: Path, query: str
     test_client, _ = client(tmp_path)
     with test_client:
         assert test_client.get(f"/api/compare?{query}").status_code == 404
+
+
+def test_the_live_feed_holds_a_red_flag_over_the_safety_car(tmp_path: Path) -> None:
+    # Spa in a storm: the safety car is deployed, a red flag follows 0.3 s later, and the Session packet only reports
+    # the safety car after both. The red flag holds until the safety car event that resumes the race.
+    records = list(read_records(FIXTURES / "race-2026-spa-red-flag.f1raw"))
+    groups: list[list[bytes]] = []
+    for i, (t_ns, data) in enumerate(records):
+        if i == 0 or t_ns - records[i - 1][0] > 500_000_000:  # windows are 1 s apart
+            groups.append([])
+        groups[-1].append(data)
+    test_client, telemetry = client(tmp_path)
+    states = []
+    with test_client, test_client.websocket_connect("/ws/live") as live:
+        for group in groups:
+            target = telemetry.state.packets_seen + len(group)
+
+            def landed(target: int = target) -> bool:
+                return telemetry.state.packets_seen == target
+
+            send(telemetry.udp_port, group)
+            wait_for(landed)
+            # The first snapshot may have been encoded before the packets landed; the next one wasn't.
+            snapshots: list[dict[str, Any]] = []
+            while len(snapshots) < 2:
+                message = live.receive_json()
+                if message["type"] == "snapshot":
+                    snapshots.append(message)
+            states.append(snapshots[-1]["race_state"])
+
+    assert states == ["green", "green", "red_flag", "red_flag", "safety_car"]
