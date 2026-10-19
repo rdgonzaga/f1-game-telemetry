@@ -28,10 +28,10 @@ export function StatusBar() {
     if (format.current) format.current.textContent = snapshot.packet_format?.toString() ?? "—";
     if (rate.current) rate.current.textContent = snapshot.connected ? String(snapshot.packets_per_second) : "0";
     const chip = race.current;
-    const tone = (snapshot.race_state && RACE_CHIP[snapshot.race_state]) ? snapshot.race_state : "none";
-    if (chip && chip.dataset.tone !== tone) {
-      chip.dataset.tone = tone;
-      chip.textContent = RACE_CHIP[tone] ?? "";
+    const shown = snapshot.race_state ? RACE_CHIP[snapshot.race_state] : undefined;
+    if (chip && chip.textContent !== (shown?.label ?? "")) {
+      chip.dataset.tone = shown?.flag ?? "none";
+      chip.textContent = shown?.label ?? "";
     }
   });
 
@@ -49,7 +49,7 @@ export function StatusBar() {
       <span
         ref={race}
         data-tone="none"
-        className="rounded-sm px-2 py-0.5 font-semibold text-text-on-fill data-[tone=none]:hidden data-[tone=red_flag]:bg-[var(--f1-flag-red)] data-[tone=safety_car]:bg-[var(--f1-flag-yellow)] data-[tone=virtual_safety_car]:bg-[var(--f1-flag-yellow)]"
+        className="rounded-sm px-2 py-0.5 font-semibold text-text-on-fill data-[tone=none]:hidden data-[tone=red]:bg-[var(--f1-flag-red)] data-[tone=yellow]:bg-[var(--f1-flag-yellow)]"
       />
 
       {status === "waiting" && setup && (
@@ -96,11 +96,16 @@ export function StatusBar() {
   );
 }
 
-/** Race states that get a chip; green and the formation lap show nothing. */
-const RACE_CHIP: Partial<Record<string, string>> = {
-  safety_car: "Safety car",
-  virtual_safety_car: "VSC",
-  red_flag: "Red flag",
+/**
+ * Race states that get a chip; green and the formation lap show nothing.
+ *
+ * The tone is the flag colour, not the state: Tailwind reads `_` in `data-[tone=red_flag]` as a space, so a
+ * selector on the state names never matched and the chip had no background.
+ */
+const RACE_CHIP: Partial<Record<string, { label: string; flag: "yellow" | "red" }>> = {
+  safety_car: { label: "Safety car", flag: "yellow" },
+  virtual_safety_car: { label: "VSC", flag: "yellow" },
+  red_flag: { label: "Red flag", flag: "red" },
 };
 
 const LABEL: Record<ReturnType<typeof useLiveStatus>, string> = {
