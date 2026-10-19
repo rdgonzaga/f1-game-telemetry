@@ -8,6 +8,7 @@ gaps between them closed to 1 s.
 | Fixture | Content | Cut from |
 |---|---|---|
 | `race-2025-melbourne-lap.f1raw` | Format 2025, Melbourne race, 1 s flat out on lap 1 | `race-2025.f1raw --start 60.0 --end 61.0` |
+| `race-2025-melbourne-pit.f1raw` | Format 2025, Melbourne race, worn tyres before a pit stop, then lap 1 closing on fresh ones | `race-2025.f1raw --start 90.0 --end 90.4 --start 123.2 --end 123.4` |
 | `tt-2026-monza-flashback.f1raw` | Format 2026, Monza Time Trial, flashback then invalid lap | `tt-2026.f1raw --start 226.3 --end 228.6` |
 | `race-2026-monza-finish.f1raw` | Format 2026, Monza race, chequered flag and session end | `race-2026.f1raw --start 321.0 --end 322.2` |
 | `f2-2026-sakhir-pit.f1raw` | Format 2026, Sakhir F2 race, pit stop Soft to Hard | `f2-2026.f1raw --start 207.2 --end 208.0` |

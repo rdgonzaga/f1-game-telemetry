@@ -5,6 +5,8 @@ import { api } from "@/api/client";
 import type { SessionSummary } from "@/api/types";
 import { useApi } from "@/api/useApi";
 import { Panel } from "@/components/Panel";
+import { DeleteSession } from "@/components/sessions/DeleteSession";
+import { Button } from "@/components/ui/button";
 import { SESSION_KINDS, formatStarted, sessionKind, type SessionKind } from "@/lib/laps";
 import { formatLapTime } from "@/lib/timing";
 import { cn } from "@/lib/utils";
@@ -19,12 +21,16 @@ const STATUS: Record<SessionSummary["status"], string> = {
 export default function Sessions() {
   const sessions = useApi("sessions", (signal) => api.sessions(signal));
   const [filter, setFilter] = useState<SessionKind | null>(null);
+  // Deleted here, so dropped from the list without fetching it again.
+  const [deleted, setDeleted] = useState<ReadonlySet<string>>(new Set());
 
   if (sessions.state === "loading") return <Message title="Sessions">Loading saved sessions.</Message>;
   if (sessions.state !== "ready") {
     return <Message title="Sessions">Can&rsquo;t reach the app&rsquo;s backend to list sessions.</Message>;
   }
-  const shown = sessions.data.filter((s) => filter === null || sessionKind(s.session_type.id) === filter);
+  const shown = sessions.data.filter(
+    (s) => !deleted.has(s.id) && (filter === null || sessionKind(s.session_type.id) === filter),
+  );
 
   return (
     <div className="flex flex-col gap-[var(--f1-gap)]">
@@ -54,8 +60,19 @@ export default function Sessions() {
       ) : (
         <ul className="flex flex-col gap-2">
           {shown.map((session) => (
-            <li key={session.id}>
+            <li key={session.id} className="flex items-center gap-3">
               <SessionRow session={session} />
+              {session.status === "recording" ? (
+                // Holds the button's width, so the row being recorded lines up with the rest.
+                <Button variant="outline" className="invisible" tabIndex={-1} aria-hidden>
+                  Delete
+                </Button>
+              ) : (
+                <DeleteSession
+                  sessionId={session.id}
+                  onDeleted={() => setDeleted((ids) => new Set(ids).add(session.id))}
+                />
+              )}
             </li>
           ))}
         </ul>
@@ -69,7 +86,7 @@ function SessionRow({ session }: { session: SessionSummary }) {
   return (
     <Link
       to={`/sessions/${encodeURIComponent(session.id)}`}
-      className="flex items-center gap-4 rounded-md border border-border bg-surface-1 px-[var(--f1-space-4)] py-3 transition-colors hover:border-border-hover hover:bg-surface-2"
+      className="flex min-w-0 flex-1 items-center gap-4 rounded-md border border-border bg-surface-1 px-[var(--f1-space-4)] py-3 transition-colors hover:border-border-hover hover:bg-surface-2"
     >
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-lg font-semibold text-text-1">{session.track.name}</span>

@@ -336,6 +336,13 @@ export interface components {
         /** LapDocument */
         LapDocument: {
             columns: components["schemas"]["LapColumns"];
+            /** Fuel Kg */
+            fuel_kg?: number | null;
+            /**
+             * Fuel Used Kg
+             * @description from the first fuel reading in the lap to its end
+             */
+            fuel_used_kg?: number | null;
             /** Invalid */
             invalid: boolean;
             /** Lap Time Ms */
@@ -354,11 +361,28 @@ export interface components {
              * @description sectors 1-3, 0 where not seen (joined mid-lap); absent on laps saved before version 2
              */
             sector_times_ms?: number[] | null;
+            /**
+             * Tyre Compound
+             * @description visual compound id
+             */
+            tyre_compound?: number | null;
+            /**
+             * Tyre Wear
+             * @description the most worn corner, percent
+             */
+            tyre_wear?: number | null;
             /** Version */
             version: number;
         };
         /** LapSummary */
         LapSummary: {
+            /** Fuel Kg */
+            fuel_kg?: number | null;
+            /**
+             * Fuel Used Kg
+             * @description from the first fuel reading in the lap to its end
+             */
+            fuel_used_kg?: number | null;
             /** Invalid */
             invalid: boolean;
             /** Lap Time Ms */
@@ -377,6 +401,16 @@ export interface components {
              * @description sectors 1-3, 0 where not seen (joined mid-lap); absent on laps saved before version 2
              */
             sector_times_ms?: number[] | null;
+            /**
+             * Tyre Compound
+             * @description visual compound id
+             */
+            tyre_compound?: number | null;
+            /**
+             * Tyre Wear
+             * @description the most worn corner, percent
+             */
+            tyre_wear?: number | null;
         };
         /** @enum {string} */
         ListenMode: "local" | "network";

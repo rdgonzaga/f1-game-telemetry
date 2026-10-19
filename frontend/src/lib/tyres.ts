@@ -54,3 +54,17 @@ export function band(value: number, edges: readonly number[], names: readonly Ba
   const above = edges.filter((edge) => value >= edge).length;
   return names[above] ?? "critical";
 }
+
+/** Visual compound ids to the sidewall the game draws. F2's wet takes the wet colour, classic tyres stay unnamed. */
+export const COMPOUNDS: Record<number, { name: string; colour: `--f1-tyre-${string}` }> = {
+  7: { name: "Inter", colour: "--f1-tyre-inter" },
+  8: { name: "Wet", colour: "--f1-tyre-wet" },
+  15: { name: "Wet", colour: "--f1-tyre-wet" },
+  16: { name: "Soft", colour: "--f1-tyre-soft" },
+  17: { name: "Medium", colour: "--f1-tyre-medium" },
+  18: { name: "Hard", colour: "--f1-tyre-hard" },
+  19: { name: "Super soft", colour: "--f1-tyre-soft" },
+  20: { name: "Soft", colour: "--f1-tyre-soft" },
+  21: { name: "Medium", colour: "--f1-tyre-medium" },
+  22: { name: "Hard", colour: "--f1-tyre-hard" },
+};

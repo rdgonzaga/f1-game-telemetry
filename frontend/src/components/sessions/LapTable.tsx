@@ -3,13 +3,15 @@ import { Link, useNavigate } from "react-router-dom";
 import type { LapSummary } from "@/api/types";
 import { bestSectors, formatSectorTime } from "@/lib/laps";
 import { formatLapTime } from "@/lib/timing";
+import { COMPOUNDS } from "@/lib/tyres";
 import { cn } from "@/lib/utils";
 
 /**
- * Every lap of a saved session: time, sectors and whether it counted.
+ * Every lap of a saved session: time, sectors, the tyre and fuel it ended on, and whether it counted.
  *
  * docs/design.md: purple is session best. The best lap's time and the fastest time in each sector column are
- * purple, taken only from laps that count, so a quicker invalid lap never wears it.
+ * purple, taken only from laps that count, so a quicker invalid lap never wears it. Laps saved before tyres and
+ * fuel were summarised show a dash there.
  */
 export function LapTable({
   sessionId,
@@ -26,10 +28,10 @@ export function LapTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[32rem] border-collapse text-sm">
+      <table className="w-full min-w-[48rem] border-collapse text-sm">
         <thead>
           <tr className="border-b border-border-soft text-left">
-            {["Lap", "Time", "S1", "S2", "S3", ""].map((label, i) => (
+            {["Lap", "Time", "S1", "S2", "S3", "Tyre", "Wear", "Fuel", "Used", ""].map((label, i) => (
               <th
                 key={i}
                 scope="col"
@@ -63,6 +65,10 @@ export function LapTable({
                     {formatSectorTime(ms)}
                   </TimeCell>
                 ))}
+                <TyreCell compound={lap.tyre_compound} />
+                <NumberCell value={lap.tyre_wear} digits={0} unit="%" />
+                <NumberCell value={lap.fuel_kg} digits={2} unit=" kg" />
+                <NumberCell value={lap.fuel_used_kg} digits={2} unit=" kg" />
                 <td className="px-3 py-2">
                   {lap.invalid && <Tag>Invalid</Tag>}
                   {lap.partial && <Tag muted>Partial</Tag>}
@@ -98,6 +104,30 @@ function TimeCell({
       )}
     >
       {children}
+    </td>
+  );
+}
+
+function TyreCell({ compound }: { compound: number | null | undefined }) {
+  const tyre = compound == null ? undefined : COMPOUNDS[compound];
+  return (
+    <td className="px-3 py-2 whitespace-nowrap text-text-2">
+      {compound == null ? (
+        "—"
+      ) : (
+        <span className="inline-flex items-center gap-2">
+          <span className="size-2 rounded-full" style={{ backgroundColor: tyre ? `var(${tyre.colour})` : undefined }} />
+          {tyre?.name ?? `Compound ${compound}`}
+        </span>
+      )}
+    </td>
+  );
+}
+
+function NumberCell({ value, digits, unit }: { value: number | null | undefined; digits: number; unit: string }) {
+  return (
+    <td className="tnum px-3 py-2 font-mono whitespace-nowrap text-text-2">
+      {value == null ? "—" : `${value.toFixed(digits)}${unit}`}
     </td>
   );
 }
