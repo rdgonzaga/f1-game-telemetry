@@ -3,7 +3,11 @@
 A free telemetry dashboard for **F1 25** and the **2026 Season Pack**. It runs on your own PC, reads the game's UDP
 telemetry and shows it in the browser. Nothing is uploaded anywhere.
 
-<!-- screenshots: Live, Sessions, Lap and Compare -->
+![Live view during a race at Monza](docs/screenshots/live.jpg)
+
+| Sessions | Lap | Compare |
+|---|---|---|
+| ![Saved sessions](docs/screenshots/sessions.jpg) | ![Speed and input traces for one lap](docs/screenshots/lap.jpg) | ![Two laps overlaid with the delta](docs/screenshots/compare.jpg) |
 
 ## Features
 
