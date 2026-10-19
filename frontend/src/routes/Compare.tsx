@@ -64,7 +64,7 @@ function CompareView({
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm text-text-3">Compare</p>
-          <h1 className="truncate text-2xl font-extrabold tracking-[var(--f1-tracking-display)] text-text-1">
+          <h1 className="truncate text-2xl font-black tracking-[var(--f1-tracking-display)] text-text-1 uppercase">
             {sessionA?.track.name ?? "Two laps"}
           </h1>
         </div>

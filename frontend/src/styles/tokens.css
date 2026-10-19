@@ -10,14 +10,15 @@
  * Direction: a race engineer's screen. Dense, data first, colour reserved for state. Dark is the only
  * theme for now; a light theme redefines these same names and nothing else.
  *
- * Palette provenance: the greys and the red are Formula 1's own, eyedroppered off formula1.com. The
- * timing colours are the sport's broadcast language (purple session best, green personal best, yellow
+ * Palette provenance: the surfaces, lines, text and red are shared with the f1-prediction site, so the
+ * two read as one product. The one exception is text-3, kept lighter than the site's #7d7d8b (see Text
+ * below). The timing colours are the sport's broadcast language (purple session best, green personal best, yellow
  * slower), which is the strongest "this is F1" signal available and is real to the subject rather than
  * decoration. See docs/design.md.
  *
  * Contrast is measured, not estimated (WCAG 2.1, worst case of the three surfaces below):
- *   text-1 16.1:1, text-2 9.6:1, text-3 5.4:1 -- all clear AA for normal text.
- *   Every state colour clears 4.5:1 EXCEPT --f1-accent (3.25:1) and --f1-text-disabled (3.14:1),
+ *   text-1 15.2:1, text-2 8.5:1, text-3 5.6:1 -- all clear AA for normal text.
+ *   Every state colour clears 4.5:1 EXCEPT --f1-accent (3.37:1) and --f1-text-disabled (3.26:1),
  *   which are marks-and-large-text only. This is load bearing: see the warning on --f1-accent.
  */
 
@@ -27,38 +28,38 @@
      black: an OLED panel smears on near-black transitions and hairlines disappear into it. The steps
      are close together (1.09:1 apart), which is deliberate -- separation comes from the border, not
      from the fill. A panel is legible because it is outlined, not because it glows. */
-  --f1-surface-0: #0d0d13; /* app ground, behind everything */
-  --f1-surface-1: #17171f; /* panel / card */
-  --f1-surface-2: #20202a; /* hover, nested block, the track behind a bar */
-  --f1-surface-sunken: #101017; /* card header strip, table header, inset well */
-  --f1-surface-chart: #101017; /* plot area, a step darker so traces carry */
-  --f1-surface-overlay: #17171ff5; /* popover, tooltip, dialog ground */
+  --f1-surface-0: #0a0a0d; /* app ground, behind everything */
+  --f1-surface-1: #15151b; /* panel / card */
+  --f1-surface-2: #1d1d26; /* hover, nested block, the track behind a bar */
+  --f1-surface-sunken: #0f0f14; /* card header strip, table header, inset well */
+  --f1-surface-chart: #0f0f14; /* plot area, a step darker so traces carry */
+  --f1-surface-overlay: #15151bf5; /* popover, tooltip, dialog ground */
   --f1-scrim: #05070ab3; /* behind a dialog, ~70% so the panel below stops competing */
 
   /* ---- Lines ---------------------------------------------------------------------------------
      Hairlines carry the structure. Shadow is reserved for things that genuinely float.
      --f1-border and --f1-border-soft are decorative separators and are intentionally below the 3:1
      non-text floor; they never carry meaning on their own. --f1-border-control is the boundary of an
-     actual control (input, select, checkbox) and does clear 3:1 (3.36:1 worst case), as WCAG requires
+     actual control (input, select, checkbox) and does clear 3:1 (3.48:1 worst case), as WCAG requires
      for anything a user has to find and click. */
-  --f1-border: #2c2c38;
-  --f1-border-soft: #1f1f28; /* row rules and grid seams inside a panel */
-  --f1-border-hover: #3e3e4c; /* a card's border on hover, paired with a surface-2 fill */
+  --f1-border: #2a2a34;
+  --f1-border-soft: #1d1d26; /* row rules and grid seams inside a panel */
+  --f1-border-hover: #3b3b48; /* a card's border on hover, paired with a surface-2 fill */
   --f1-border-control: #70708a;
   --f1-focus: #6fb6ff; /* focus ring, 2px, never removed */
   --f1-shadow-overlay: 0 8px 24px #04060a99;
 
   /* ---- Text ----------------------------------------------------------------------------------
      text-3 is the floor for anything a user has to read. An earlier pass used #8a8a93 for this and it
-     was rejected on sight as "too grey"; do not darken it back. */
-  --f1-text-1: #ffffff; /* values, headings */
-  --f1-text-2: #c7c7d2; /* body, secondary values */
+     was rejected on sight as "too grey"; do not darken it back, not even to match the prediction site. */
+  --f1-text-1: #f4f4f6; /* values, headings */
+  --f1-text-2: #b8b8c4; /* body, secondary values */
   --f1-text-3: #9295a3; /* labels, units, axis ticks */
   --f1-text-disabled: #6a6d7c; /* disabled controls only; below AA by design, never for real content */
-  --f1-text-on-fill: #0d0d13; /* dark ink on a filled state chip */
+  --f1-text-on-fill: #0a0a0d; /* dark ink on a filled state chip */
 
   /* ---- Brand -------------------------------------------------------------------------------- */
-  /* F1 red. WARNING: 3.25:1 at worst, so it is legal for marks, fills, rules and text at 24px+/19px
+  /* F1 red. WARNING: 3.37:1 at worst, so it is legal for marks, fills, rules and text at 24px+/19px
      bold, and ILLEGAL for small text. A red label, a red unit, a red table cell -- all wrong. When
      something red has to be read at body size, use --f1-critical instead. Kept scarce on purpose:
      once red is everywhere it stops meaning anything. */
@@ -72,7 +73,7 @@
   --f1-timing-slow: #f5c518; /* slower than your own best */
   /* F1 broadcast purple is #b14fdb, which measures 3.85:1 on --f1-surface-2 and fails AA for the
      small text it would actually carry (a lap time in a table). Lightened just far enough to pass
-     at 4.65:1 while still reading as the same colour. */
+     at 4.82:1 while still reading as the same colour. */
 
   /* ---- Delta and status ----------------------------------------------------------------------
      Gain/loss share hues with timing on purpose: green is "good" in both, yellow is "caution" in
@@ -131,7 +132,7 @@
   --f1-lap-b-dash: 7 5;
 
   /* Channel fills. These tint the area under a trace; they never own a stroke when two laps are up. */
-  --f1-chart-speed: #c7c7d2;
+  --f1-chart-speed: #b8b8c4;
   --f1-chart-throttle: #00d06c;
   --f1-chart-brake: #e10600;
   --f1-chart-steer: #7fb2ff;
@@ -140,8 +141,8 @@
   --f1-chart-drs: #2dd4bf;
   --f1-chart-fill-opacity: 0.16;
 
-  --f1-chart-grid: #1f1f28;
-  --f1-chart-axis: #2c2c38;
+  --f1-chart-grid: #1d1d26;
+  --f1-chart-axis: #2a2a34;
   --f1-chart-cursor: #6fb6ff;
 
   /* ---- Thresholds ----------------------------------------------------------------------------
@@ -206,15 +207,13 @@
   --f1-rev-redline: 0.88;
 
   /* ---- Type ----------------------------------------------------------------------------------
-     Two faces with one job each: SAIRA carries words, IOSEVKA carries figures. They must never appear
-     at the same size directly next to each other -- a 44px lap time beside a 44px circuit name is what
-     made an earlier pass look like one badly-rendered font. Size or weight always separates them.
-     The pairing works because Saira is squarish and wide while Iosevka is narrow; an earlier attempt
-     paired Iosevka with Barlow Semi Condensed, and two narrow faces read as one inconsistent face.
+     Two faces with one job each, the same pair as the f1-prediction site: TITILLIUM WEB carries words,
+     JETBRAINS MONO carries figures. They must never appear at the same size directly next to each
+     other -- a 44px lap time beside a 44px circuit name is what made an earlier pass look like one
+     badly-rendered font. Size or weight always separates them.
      Both are self-hosted: the app runs on localhost and must not depend on the network. */
-  /* "Iosevka" is the family Fontsource ships under; "Iosevka Web" is what Iosevka's own build names it. */
-  --f1-font-num: "Iosevka", "Iosevka Web", ui-monospace, "Cascadia Mono", Consolas, monospace;
-  --f1-font-ui: "Saira", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f1-font-num: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --f1-font-ui: "Titillium Web", "Segoe UI", system-ui, -apple-system, sans-serif;
 
   /* Type scale. 16px base: an earlier pass ran 15px with 10px labels and was rejected as too small.
      11px is reserved for uppercase micro-labels and axis numerals, each paired with a large value. */
@@ -233,7 +232,7 @@
   --f1-weight-body: 400;
   --f1-weight-value: 600;
   --f1-weight-label: 600;
-  --f1-weight-display: 800; /* Saira at hero sizes, closest to F1's own headings */
+  --f1-weight-display: 900; /* Titillium Web Black, the prediction site's headings */
   --f1-tracking-label: 0.09em;
   --f1-tracking-display: -0.01em;
 
@@ -253,13 +252,14 @@
   --f1-control-h: 34px; /* button, input, select; also the touch floor we accept on desktop */
   --f1-statusbar-h: 32px;
   --f1-header-h: 46px; /* a card's header strip */
-  --f1-rail-w: 184px; /* the nav rail */
+  --f1-topbar-h: 54px; /* the nav bar, black with a red rule, as on the prediction site */
+  --f1-topbar-rule: 3px;
   --f1-panel-pad: var(--f1-space-4);
   --f1-gap: var(--f1-space-3); /* cards sit in a grid with a real gutter, not a 1px seam */
 
-  /* ---- Radii: small and engineered. Pills are for status only. ------------------------------ */
-  --f1-radius-sm: 4px;
-  --f1-radius-md: 8px;
+  /* ---- Radii: near square, like the prediction site. Pills are for status only. ------------- */
+  --f1-radius-sm: 2px;
+  --f1-radius-md: 2px;
   --f1-radius-pill: 999px;
 
   /* ---- Motion --------------------------------------------------------------------------------

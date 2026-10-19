@@ -1,54 +1,54 @@
-import { Activity, GitCompareArrows, ListOrdered, Plug } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
 import { StatusBar } from "@/components/StatusBar";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
-  { to: "/", label: "Live", icon: Activity, end: true },
-  { to: "/sessions", label: "Sessions", icon: ListOrdered, end: false },
-  { to: "/compare", label: "Compare", icon: GitCompareArrows, end: false },
-  { to: "/setup", label: "Setup", icon: Plug, end: false },
+  { to: "/", label: "Live", end: true },
+  { to: "/sessions", label: "Sessions", end: false },
+  { to: "/compare", label: "Compare", end: false },
+  { to: "/setup", label: "Setup", end: false },
 ];
 
 /**
- * The frame: a fixed nav rail, the route, and the status bar along the bottom.
+ * The frame: the top bar, the route, and the status bar along the bottom.
  *
+ * The top bar is the f1-prediction site's: black, a red rule under it, the skewed red mark and uppercase links.
  * Nothing here scrolls. Panels scroll inside the route, so a live value never moves because something else grew.
  */
 export default function App() {
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-surface-0 text-text-2">
-      <nav className="flex w-[var(--f1-rail-w)] shrink-0 flex-col gap-1 border-r border-border bg-surface-1 p-2">
-        <div className="mb-2 px-2 pt-2">
-          <span className="font-sans text-md font-extrabold tracking-[var(--f1-tracking-display)] text-text-1">
-            F1 TELEMETRY
-          </span>
-        </div>
-        {LINKS.map(({ to, label, icon: Icon, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              cn(
-                "flex h-[var(--f1-control-h)] items-center gap-3 rounded-sm px-3 text-sm font-semibold transition-colors",
-                isActive ? "bg-surface-2 text-text-1" : "text-text-3 hover:bg-surface-2 hover:text-text-2",
-              )
-            }
-          >
-            <Icon className="size-4" aria-hidden />
-            {label}
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-surface-0 text-text-2">
+      <header className="shrink-0 border-b-[length:var(--f1-topbar-rule)] border-brand bg-black">
+        <div className="flex h-[var(--f1-topbar-h)] items-center gap-6 px-[var(--f1-space-4)]">
+          <NavLink to="/" className="flex items-center gap-2 text-md font-black whitespace-nowrap text-text-1">
+            <span className="size-3.5 -skew-x-[20deg] bg-brand" aria-hidden />
+            F1<span className="text-brand">TELEMETRY</span>
           </NavLink>
-        ))}
-      </nav>
+          <nav className="flex gap-0.5 self-stretch overflow-x-auto" aria-label="Main">
+            {LINKS.map(({ to, label, end }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center border-b-[length:var(--f1-topbar-rule)] px-2.5 pt-[3px] text-sm font-bold tracking-[0.06em] whitespace-nowrap uppercase transition-colors",
+                    isActive ? "border-text-1 text-text-1" : "border-transparent text-text-2 hover:text-text-1",
+                  )
+                }
+              >
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+        </div>
+      </header>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <main className="min-h-0 flex-1 overflow-auto p-[var(--f1-gap)]">
-          <Outlet />
-        </main>
-        <StatusBar />
-      </div>
+      <main className="min-h-0 flex-1 overflow-auto p-[var(--f1-gap)]">
+        <Outlet />
+      </main>
+      <StatusBar />
     </div>
   );
 }

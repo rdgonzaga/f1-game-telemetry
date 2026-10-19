@@ -58,7 +58,7 @@ export default function LapDetail() {
               </Link>
             )}
           </p>
-          <h1 className="text-2xl font-extrabold tracking-[var(--f1-tracking-display)] text-text-1">
+          <h1 className="text-2xl font-black tracking-[var(--f1-tracking-display)] text-text-1 uppercase">
             Lap {data.number}
             {data.invalid && <span className="ml-3 align-middle text-sm font-semibold text-timing-slow">Invalid</span>}
             {data.partial && <span className="ml-3 align-middle text-sm font-semibold text-text-3">Partial</span>}
