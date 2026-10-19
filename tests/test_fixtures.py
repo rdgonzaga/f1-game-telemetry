@@ -31,6 +31,7 @@ MAX_FIXTURE_BYTES = 300_000
 # name: (packet format, player car index, session UIDs)
 EXPECTED = {
     "race-2025-melbourne-lap": (2025, 19, 1),
+    "race-2025-melbourne-pit": (2025, 19, 1),
     "tt-2026-monza-flashback": (2026, 0, 1),
     "race-2026-monza-finish": (2026, 21, 1),
     "f2-2026-sakhir-pit": (2026, 21, 1),

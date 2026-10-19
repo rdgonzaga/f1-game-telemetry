@@ -81,16 +81,19 @@ def lap_summary(lap: Lap) -> Json:
 def _tyre_and_fuel(samples: LapSamples) -> Json:
     """Tyres and fuel as the lap ended, so the lap table needn't load lap files; None where never seen.
 
-    Rows before the first CarStatus or CarDamage hold 0, so fuel used starts from the first real reading.
+    Rows before the first CarStatus or CarDamage hold 0, so fuel used starts from the first real reading. Wear is
+    None only if it never moved in the lap (Time Trial freezes it); a lap ending on fresh tyres reads 0.
     """
     corners = (samples.tyre_wear_rl, samples.tyre_wear_rr, samples.tyre_wear_fl, samples.tyre_wear_fr)
-    wear = round(max(corner[-1] if corner else 0.0 for corner in corners), 2)
+    wear: float | None = round(max(corner[-1] if corner else 0.0 for corner in corners), 2)
+    if not wear and not any(any(corner) for corner in corners):
+        wear = None
     fuel = samples.fuel_in_tank
     start = next((kg for kg in fuel if kg > 0), None)
     end = round(fuel[-1], 2) if start is not None else None
     return {
         "tyre_compound": (samples.tyre_compound[-1] if samples.tyre_compound else 0) or None,
-        "tyre_wear": wear or None,
+        "tyre_wear": wear,
         "fuel_kg": end,
         "fuel_used_kg": round(round(start, 2) - end, 2) if start is not None and end is not None else None,
     }

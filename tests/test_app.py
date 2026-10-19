@@ -390,6 +390,19 @@ def test_a_saved_lap_keeps_tyres_fuel_ers_position_and_sectors(tmp_path: Path) -
     assert summary["fuel_used_kg"] == round(columns["fuel_in_tank"][0] - columns["fuel_in_tank"][-1], 2) > 0
 
 
+def test_a_lap_ending_on_fresh_tyres_reads_zero_wear_not_unknown(tmp_path: Path) -> None:
+    # Pitted at the end of lap 1: wear 3% before the stop, 0% on the new set as the lap closes.
+    packets = [data for _, data in read_records(FIXTURES / "race-2025-melbourne-pit.f1raw")]
+    test_client, telemetry = client(tmp_path)
+    with test_client:
+        send(telemetry.udp_port, packets)
+        wait_for(lambda: telemetry.state.packets_seen == len(packets))
+
+    [saved] = SessionStore(tmp_path).list_sessions()
+    [summary] = saved["laps"]
+    assert summary["tyre_wear"] == 0
+
+
 def test_without_a_built_frontend_the_root_explains(tmp_path: Path) -> None:
     test_client, _ = client(tmp_path, web_dir=tmp_path / "missing")
     with test_client:
