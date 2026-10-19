@@ -51,6 +51,11 @@ class LapSummary(BaseModel):
     sector_times_ms: list[int] | None = Field(
         None, description="sectors 1-3, 0 where not seen (joined mid-lap); absent on laps saved before version 2"
     )
+    # Absent on laps saved before these were added, None where never seen; all as the lap ended.
+    tyre_compound: int | None = Field(None, description="visual compound id")
+    tyre_wear: float | None = Field(None, description="the most worn corner, percent")
+    fuel_kg: float | None = None
+    fuel_used_kg: float | None = Field(None, description="from the first fuel reading in the lap to its end")
 
 
 class SessionDocument(BaseModel):

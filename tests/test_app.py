@@ -383,6 +383,11 @@ def test_a_saved_lap_keeps_tyres_fuel_ers_position_and_sectors(tmp_path: Path) -
     assert all(0 <= mj <= 4 for mj in columns["ers_store_mj"])
     # Driven across the line, so the car moves on the map.
     assert len(set(zip(columns["world_x"], columns["world_z"], strict=True))) > 1
+    # The lap table reads tyres and fuel from the summary, without loading the lap file.
+    assert summary["tyre_compound"] == 7
+    assert summary["tyre_wear"] == max(columns[f"tyre_wear_{c}"][-1] for c in corners)
+    assert summary["fuel_kg"] == columns["fuel_in_tank"][-1]
+    assert summary["fuel_used_kg"] == round(columns["fuel_in_tank"][0] - columns["fuel_in_tank"][-1], 2) > 0
 
 
 def test_without_a_built_frontend_the_root_explains(tmp_path: Path) -> None:

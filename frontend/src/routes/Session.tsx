@@ -1,9 +1,9 @@
-import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { api } from "@/api/client";
 import { useApi } from "@/api/useApi";
 import { Panel } from "@/components/Panel";
+import { DeleteSession } from "@/components/sessions/DeleteSession";
 import { LapTable } from "@/components/sessions/LapTable";
 import { Button } from "@/components/ui/button";
 import { formatStarted } from "@/lib/laps";
@@ -12,6 +12,7 @@ import { formatLapTime } from "@/lib/timing";
 /** One saved session: what it was, its best lap, and every lap to pick from. */
 export default function Session() {
   const { sessionId = "" } = useParams();
+  const navigate = useNavigate();
   const session = useApi(`session:${sessionId}`, (signal) => api.session(sessionId, signal));
 
   if (session.state !== "ready") {
@@ -60,7 +61,9 @@ export default function Session() {
               <Link to={`/compare?session=${encodeURIComponent(data.id)}`}>Compare laps</Link>
             </Button>
           )}
-          {data.status !== "recording" && <DeleteSession sessionId={data.id} />}
+          {data.status !== "recording" && (
+            <DeleteSession sessionId={data.id} onDeleted={() => void navigate("/sessions", { replace: true })} />
+          )}
         </div>
       </header>
 
@@ -75,47 +78,6 @@ export default function Session() {
           <p className="p-[var(--f1-panel-pad)] text-text-3">No lap was completed in this session.</p>
         )}
       </Panel>
-    </div>
-  );
-}
-
-/** Two clicks, the second on a red button, so a stray click can't lose a session. No browser dialog. */
-function DeleteSession({ sessionId }: { sessionId: string }) {
-  const navigate = useNavigate();
-  const [step, setStep] = useState<"idle" | "confirm" | "deleting">("idle");
-  const [failed, setFailed] = useState<string | null>(null);
-
-  if (step === "idle") {
-    return (
-      <Button variant="outline" onClick={() => setStep("confirm")}>
-        Delete
-      </Button>
-    );
-  }
-
-  const remove = () => {
-    setStep("deleting");
-    setFailed(null);
-    api.deleteSession(sessionId).then(
-      () => navigate("/sessions", { replace: true }),
-      (error: unknown) => {
-        setFailed(error instanceof Error ? error.message : String(error));
-        setStep("confirm");
-      },
-    );
-  };
-
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <div className="flex gap-2">
-        <Button variant="ghost" disabled={step === "deleting"} onClick={() => setStep("idle")}>
-          Cancel
-        </Button>
-        <Button variant="destructive" disabled={step === "deleting"} onClick={remove}>
-          Delete session and laps
-        </Button>
-      </div>
-      {failed && <p className="text-sm text-critical">Couldn&rsquo;t delete: {failed}</p>}
     </div>
   );
 }

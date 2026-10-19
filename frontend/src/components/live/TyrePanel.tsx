@@ -2,7 +2,7 @@ import { useImperativeHandle, useRef, useState } from "react";
 
 import type { LiveSnapshot } from "@/api/types";
 import { LivePanel } from "@/components/live/LivePanel";
-import { BRAKE_BANDS, TYRE_BANDS, band, bandsFor, readBrakeTokens, readTyreTokens, type Band } from "@/lib/tyres";
+import { BRAKE_BANDS, COMPOUNDS, TYRE_BANDS, band, bandsFor, readBrakeTokens, readTyreTokens, type Band } from "@/lib/tyres";
 import { useLiveFrame } from "@/live/useLive";
 
 type Corner = "fl" | "fr" | "rl" | "rr";
@@ -60,20 +60,6 @@ export function TyrePanel() {
 }
 
 const CORNERS: readonly Corner[] = ["fl", "fr", "rl", "rr"];
-
-/** Visual compound ids to the sidewall the game draws. F2's wet takes the wet colour, classic tyres stay unnamed. */
-const COMPOUNDS: Record<number, { name: string; colour: `--f1-tyre-${string}` }> = {
-  7: { name: "Inter", colour: "--f1-tyre-inter" },
-  8: { name: "Wet", colour: "--f1-tyre-wet" },
-  15: { name: "Wet", colour: "--f1-tyre-wet" },
-  16: { name: "Soft", colour: "--f1-tyre-soft" },
-  17: { name: "Medium", colour: "--f1-tyre-medium" },
-  18: { name: "Hard", colour: "--f1-tyre-hard" },
-  19: { name: "Super soft", colour: "--f1-tyre-soft" },
-  20: { name: "Soft", colour: "--f1-tyre-soft" },
-  21: { name: "Medium", colour: "--f1-tyre-medium" },
-  22: { name: "Hard", colour: "--f1-tyre-hard" },
-};
 
 interface CornerValues {
   carcass?: number;
